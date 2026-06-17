@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header">
+    <span class="eyebrow">Catàleg</span>
+    <h2>Serveis RURAL-GO VIVA</h2>
+    <p>Descobreix els serveis disponibles i tria el tipus de trajecte que millor encaixa amb la necessitat.</p>
+  </div>
+
+  <div class="service-filterbar mb-4" id="serviceFilterbar">
+    <button class="chip active" type="button" data-category="all">Tots</button>
+    <button class="chip" type="button" data-category="Cultura">Cultura</button>
+    <button class="chip" type="button" data-category="Família">Família</button>
+    <button class="chip" type="button" data-category="Salut">Salut</button>
+    <button class="chip" type="button" data-category="Serveis Comunitaris">Comunitaris</button>
+    <button class="chip" type="button" data-category="Natura">Natura</button>
+    <button class="chip" type="button" data-category="Urgència">Urgència</button>
+  </div>
+
+  <div class="service-catalog-grid">
+    {% for service in services %}
+      <article class="service-detail-card service-click-card" data-category="{{ service.category }}" data-href="{% if current_user and current_user.role in ['family', 'admin'] %}/book?service_type={{ service.service_type }}{% elif current_user and current_user.role == 'driver' %}#{% else %}/login{% endif %}">
+        <div class="service-detail-top">
+          <span class="service-category">{{ service.category }}</span>
+          <span class="service-rating">4.8/5 · {{ service.response_time }}</span>
+        </div>
+        <h3>{{ service.name }}</h3>
+        <p>{{ service.description }}</p>
+        <div class="pricing-row">
+          <div><span>Base</span><strong>{{ '%.2f'|format(service.base_fare) }} €</strong></div>
+          <div><span>Per km</span><strong>{{ '%.2f'|format(service.price_per_km) }} €</strong></div>
+          <div><span>Horari</span><strong>{{ service.hours }}</strong></div>
+        </div>
+        <div class="detail-list">
+          <strong>Casos d'ús</strong>
+          <ul>
+            {% for use_case in service.use_cases %}
+              <li>{{ use_case }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="chip-grid">
+          {% for feature in service.features %}
+            <span class="chip">{{ feature }}</span>
+          {% endfor %}
+        </div>
+        {% if current_user and current_user.role in ['family', 'admin'] %}
+          <form method="post" action="/services/{{ service.id }}/book-now" class="mt-3">
+            <button class="btn btn-sm btn-primary" type="submit">Aplicar i reservar</button>
+          </form>
+        {% elif current_user and current_user.role == 'driver' %}
+          <span class="btn btn-sm btn-outline-secondary mt-3 disabled">Solo consulta</span>
+        {% else %}
+          <a class="btn btn-sm btn-primary mt-3" href="/login">Entrar per reservar</a>
+        {% endif %}
+      </article>
+    {% endfor %}
+  </div>
+
+  <section class="content-band mt-4">
+    <div class="section-heading">
+      <span class="eyebrow">Domus Viva</span>
+      <h2>Activitats accessibles recomanades</h2>
+    </div>
+    <div class="activity-grid">
+      {% for activity in activities %}
+        <article class="activity-card">
+          <div class="activity-card-head">
+            <strong>{{ activity.name }}</strong>
+            <span>{{ activity.rating }}/5</span>
+          </div>
+          <p>{{ activity.description }}</p>
+          <div class="activity-meta">
+            <span>{{ activity.location }}</span>
+            <span>{{ activity.duration }}</span>
+            <span>{% if activity.price == 0 %}Gratis{% else %}{{ activity.price }} €{% endif %}</span>
+            <span>{{ activity.difficulty }}</span>
+          </div>
+          <div class="chip-grid mt-2">
+            {% for tag in activity.tags %}
+              <span class="chip">{{ tag }}</span>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      const buttons = Array.from(document.querySelectorAll('#serviceFilterbar [data-category]'));
+      const cards = Array.from(document.querySelectorAll('.service-detail-card'));
+      cards.forEach((card) => {
+        card.addEventListener('click', function (event) {
+          if (event.target.closest('a, button')) return;
+          if (card.dataset.href && card.dataset.href !== '#') window.location.href = card.dataset.href;
+        });
+      });
+      buttons.forEach((button) => {
+        button.addEventListener('click', function () {
+          const category = button.dataset.category;
+          buttons.forEach((item) => item.classList.remove('active'));
+          button.classList.add('active');
+          cards.forEach((card) => {
+            card.hidden = category !== 'all' && card.dataset.category !== category;
+          });
+        });
+      });
+    })();
+  </script>
+{% endblock %}

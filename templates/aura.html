@@ -1,0 +1,485 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header aura-simple-header">
+    <span class="eyebrow">Acompanyament guiat</span>
+    <h2>AURA</h2>
+    <p>AURA no començarà fins que premis iniciar. Després et parlarà pas a pas, et preguntarà les dades importants i registrarà la reserva automàticament quan acabeu.</p>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="panel-card aura-chat-card">
+        <div class="aura-start-panel" id="auraStartPanel">
+          <span class="eyebrow">Mode conversa</span>
+          <h3>Comença quan estiguis preparat</h3>
+          <p>AURA farà preguntes curtes sobre servei, origen, destinació, conductor i assistència. Pots respondre escrivint o amb el micròfon.</p>
+          <button class="btn btn-warning" type="button" id="start-aura-btn">Iniciar AURA</button>
+        </div>
+
+        <div class="aura-chat-ui is-disabled" id="auraChatUi">
+          <div class="aura-chat-head mb-3">
+            <div>
+              <span class="eyebrow">Conversació</span>
+              <h5 class="mb-0">Reserva guiada per veu</h5>
+            </div>
+            <span class="chip" id="auraVoiceChip">Veu preparada</span>
+          </div>
+
+          <div id="auraTranscript" class="aura-transcript mb-3" aria-live="polite"></div>
+
+          <div class="aura-quick-actions mb-3">
+            <div class="small text-muted mb-2">Respostes ràpides</div>
+            <div class="chip-grid" id="quickReplyGrid"></div>
+          </div>
+
+          <form method="post" id="aura-form">
+            <input type="hidden" name="requester" value="{{ current_user.full_name }}">
+            <input type="hidden" name="phone" value="{{ current_user.phone }}">
+            <input type="hidden" name="service_type" id="service_type_field">
+            <input type="hidden" name="origin" id="origin_field">
+            <input type="hidden" name="destination" id="destination_field">
+            <input type="hidden" name="preferred_driver_id" id="preferred_driver_field" value="any">
+            <input type="hidden" name="command_text" id="command_text_field">
+            <input type="hidden" name="summary_text" id="summary_text_field">
+            <input type="hidden" name="wheelchair" id="wheelchair_field">
+            <input type="hidden" name="vulnerable" id="vulnerable_field">
+            <input type="hidden" name="viva_pass" id="viva_pass_field">
+            <div id="supportNeedsFields"></div>
+
+            <div class="mb-3">
+              <label class="form-label" for="auraInput">Resposta</label>
+              <textarea class="form-control aura-textarea" id="auraInput" rows="3" placeholder="Escriu o dicta la resposta"></textarea>
+            </div>
+
+            <div class="aura-actions">
+              <button class="btn btn-success aura-mic-btn" type="button" id="voice-btn" aria-label="Dictar amb veu" title="Dictar amb veu">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-2.08A7 7 0 0 0 19 11Z"/></svg>
+              </button>
+              <button class="btn btn-outline-secondary" type="button" id="clear-btn">Reiniciar</button>
+              <button class="btn btn-primary" type="button" id="next-btn">Respondre</button>
+            </div>
+            <p class="aura-help mb-3" id="voice-status">Prem iniciar perquè AURA comenci a parlar.</p>
+            <div class="d-flex justify-content-end">
+              <button class="btn btn-warning" type="submit" id="submit-btn" disabled>Reserva automàtica preparada</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="panel-card aura-card aura-simple-result">
+        <span class="eyebrow">Resum en directe</span>
+        <h5 id="summaryTitle">AURA en espera</h5>
+        <p class="mb-2" id="summaryText">Quan iniciïs el xat, AURA anirà omplint la reserva.</p>
+        <div class="aura-meta mb-3">
+          <span class="chip" id="summaryService">Servei: -</span>
+          <span class="chip" id="summaryDriver">Conductor: qualsevol</span>
+          <span class="chip" id="summaryConfidence">Pas 0 de 8</span>
+        </div>
+        <div class="aura-summary-box">
+          <strong>Finalització</strong>
+          <p class="mb-0" id="summaryNextStep">En acabar, AURA dirà que ho heu fet molt bé i registrarà la reserva sense més clics.</p>
+        </div>
+      </div>
+      <div class="panel-card mt-3 aura-tips">
+        <strong>Dades que preguntarà</strong>
+        <div class="aura-data-grid mt-2">
+          <span>Servei</span>
+          <span>Origen</span>
+          <span>Destinació</span>
+          <span>Conductor</span>
+          <span>Accessibilitat</span>
+          <span>Valoració</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const transcript = document.getElementById('auraTranscript');
+      const auraInput = document.getElementById('auraInput');
+      const voiceBtn = document.getElementById('voice-btn');
+      const clearBtn = document.getElementById('clear-btn');
+      const nextBtn = document.getElementById('next-btn');
+      const submitBtn = document.getElementById('submit-btn');
+      const startBtn = document.getElementById('start-aura-btn');
+      const startPanel = document.getElementById('auraStartPanel');
+      const chatUi = document.getElementById('auraChatUi');
+      const voiceStatus = document.getElementById('voice-status');
+      const voiceChip = document.getElementById('auraVoiceChip');
+      const summaryTitle = document.getElementById('summaryTitle');
+      const summaryText = document.getElementById('summaryText');
+      const summaryNextStep = document.getElementById('summaryNextStep');
+      const summaryService = document.getElementById('summaryService');
+      const summaryDriver = document.getElementById('summaryDriver');
+      const summaryConfidence = document.getElementById('summaryConfidence');
+      const summaryTitleField = document.getElementById('summary_text_field');
+      const serviceField = document.getElementById('service_type_field');
+      const originField = document.getElementById('origin_field');
+      const destinationField = document.getElementById('destination_field');
+      const preferredDriverField = document.getElementById('preferred_driver_field');
+      const commandField = document.getElementById('command_text_field');
+      const wheelchairField = document.getElementById('wheelchair_field');
+      const vulnerableField = document.getElementById('vulnerable_field');
+      const vivaPassField = document.getElementById('viva_pass_field');
+      const supportNeedsFields = document.getElementById('supportNeedsFields');
+      const quickReplyGrid = document.getElementById('quickReplyGrid');
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const supportNeedLabels = {
+        walk_assistance: 'Ajuda per caminar',
+        accompany_home: 'Acompanyament fins a casa',
+        help_bags: 'Ajudar amb les bosses',
+        wait_during_visit: 'Espera durant la cita',
+        phone_support: 'Acompanyament telefònic',
+      };
+      const drivers = [
+        { id: 'any', name: 'Qualsevol conductor' },
+        {% for driver in drivers %}
+          { id: {{ driver.id|string|tojson }}, name: {{ driver.full_name|tojson }}, busy: {{ (driver_busy_map and driver_busy_map.get(driver.id))|tojson }} }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ];
+
+      const steps = [
+        { key: 'service_type', question: 'Quin servei vols reservar?', helper: 'Pots dir Salut, Família, Cultura, Comunitat o Natura.', options: ['Salut', 'Família', 'Cultura', 'Comunitat', 'Natura'] },
+        { key: 'origin', question: 'Des d’on vols sortir exactament?', helper: 'Digues poble, carrer, centre o ubicació concreta.' },
+        { key: 'destination', question: 'On vols anar exactament?', helper: 'Digues el destí final, per exemple CAP, hospital, teatre, mercat o una adreça.' },
+        { key: 'preferred_driver_id', question: 'Quin conductor prefereixes?', helper: 'Pots escollir una persona o deixar que Rural GO triï el disponible.', options: drivers.map((driver) => driver.busy ? `${driver.name} (té ruta activa)` : driver.name) },
+        { key: 'wheelchair', question: 'Necessites vehicle adaptat per cadira de rodes?', helper: 'Respon sí o no.', options: ['Sí', 'No'] },
+        { key: 'vulnerable', question: 'Vols marcar perfil vulnerable per aplicar subvenció?', helper: 'Respon sí o no.', options: ['Sí', 'No'] },
+        { key: 'viva_pass', question: 'Tens VIVA Pass actiu?', helper: 'Si el tens, AURA aplicarà el descompte.', options: ['Sí', 'No'] },
+        {
+          key: 'support_needs',
+          question: 'Quina ajuda necessites durant el trajecte?',
+          helper: 'Pots triar una o més opcions. Si no cal res, escriu no.',
+          options: [
+            { label: 'Ajuda per caminar', value: 'walk_assistance' },
+            { label: 'Acompanyament fins a casa', value: 'accompany_home' },
+            { label: 'Ajudar amb les bosses', value: 'help_bags' },
+            { label: 'Espera durant la cita', value: 'wait_during_visit' },
+            { label: 'Acompanyament telefònic', value: 'phone_support' },
+            { label: 'No cal ajuda', value: 'none' },
+          ],
+          multi: true,
+        },
+      ];
+
+      const state = {
+        started: false,
+        index: 0,
+        service_type: '',
+        origin: '',
+        destination: '',
+        preferred_driver_id: 'any',
+        preferred_driver_name: 'Qualsevol conductor',
+        wheelchair: false,
+        vulnerable: false,
+        viva_pass: false,
+        support_needs: [],
+      };
+
+      let preferredVoice = null;
+
+      function chooseVoice() {
+        if (!window.speechSynthesis) return null;
+        const voices = window.speechSynthesis.getVoices();
+        const preferred = voices.find((voice) => /female|mujer|dona|lucia|elvira|helena|mónica|monica|laura|paulina/i.test(voice.name) && /es|ca/i.test(voice.lang));
+        preferredVoice = preferred || voices.find((voice) => /es-ES|ca-ES/i.test(voice.lang)) || voices.find((voice) => /^es/i.test(voice.lang)) || null;
+        if (preferredVoice) voiceChip.textContent = `Veu: ${preferredVoice.name.split(' ')[0]}`;
+        return preferredVoice;
+      }
+
+      if (window.speechSynthesis) {
+        chooseVoice();
+        window.speechSynthesis.onvoiceschanged = chooseVoice;
+      }
+
+      function speak(text, onEnd) {
+        if (!window.speechSynthesis) {
+          if (onEnd) onEnd();
+          return;
+        }
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = preferredVoice ? preferredVoice.lang : 'es-ES';
+        utterance.voice = preferredVoice;
+        utterance.rate = 0.92;
+        utterance.pitch = 1.08;
+        utterance.onend = function () {
+          if (onEnd) onEnd();
+        };
+        window.speechSynthesis.speak(utterance);
+      }
+
+      function pushBubble(role, text, shouldSpeak) {
+        const bubble = document.createElement('div');
+        bubble.className = `aura-bubble ${role === 'assistant' ? 'aura-bubble-assistant' : 'aura-bubble-user'}`;
+        bubble.innerHTML = `<div class="small text-muted">${role === 'assistant' ? 'AURA' : 'Tu'}</div><div>${text}</div>`;
+        transcript.appendChild(bubble);
+        transcript.scrollTop = transcript.scrollHeight;
+        if (role === 'assistant' && shouldSpeak) speak(text);
+      }
+
+      function normalizeText(text) {
+        return (text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      }
+
+      function isYes(text) {
+        return ['si', 'sí', 'vale', 'ok', 'correcte', 'correcto', 'afirmatiu'].some((word) => normalizeText(text).includes(word));
+      }
+
+      function renderQuickReplies(step) {
+        quickReplyGrid.innerHTML = '';
+        if (!step.options) return;
+        step.options.forEach((option) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'chip aura-quick-reply';
+          const optionLabel = typeof option === 'string' ? option : option.label;
+          const optionValue = typeof option === 'string' ? option : option.value;
+          button.textContent = optionLabel;
+          if (step.multi && state.support_needs.includes(optionValue)) button.classList.add('active');
+          button.addEventListener('click', function () {
+            if (step.multi) {
+              if (optionValue === 'none') {
+                state.support_needs = [];
+                auraInput.value = 'No cal ajuda';
+                Array.from(quickReplyGrid.children).forEach((item) => item.classList.remove('active'));
+                button.classList.add('active');
+              } else if (state.support_needs.includes(optionValue)) {
+                state.support_needs = state.support_needs.filter((item) => item !== optionValue);
+                button.classList.remove('active');
+              } else {
+                state.support_needs.push(optionValue);
+                button.classList.add('active');
+              }
+              if (optionValue !== 'none') auraInput.value = state.support_needs.map((item) => supportNeedLabels[item] || item).join(', ');
+              syncHiddenFields();
+              updateSummary();
+            } else {
+              auraInput.value = optionLabel;
+              nextBtn.click();
+            }
+          });
+          quickReplyGrid.appendChild(button);
+        });
+      }
+
+      function updateSummary() {
+        const completed = state.index >= steps.length;
+        summaryTitle.textContent = completed ? 'Reserva completada' : state.started ? 'AURA està recopilant dades' : 'AURA en espera';
+        summaryText.textContent = completed
+          ? `Trajecte ${state.service_type} de ${state.origin} a ${state.destination}.`
+          : state.started ? steps[state.index].question : 'Quan iniciïs el xat, AURA anirà omplint la reserva.';
+        summaryService.textContent = `Servei: ${state.service_type || '-'}`;
+        summaryDriver.textContent = `Conductor: ${state.preferred_driver_name || 'qualsevol'}`;
+        summaryConfidence.textContent = `Pas ${Math.min(state.index, steps.length)} de ${steps.length}`;
+        summaryNextStep.textContent = completed
+          ? 'AURA està registrant la reserva automàticament.'
+          : state.started ? steps[state.index].helper : 'Prem iniciar per començar.';
+      }
+
+      function syncHiddenFields() {
+        serviceField.value = state.service_type;
+        originField.value = state.origin;
+        destinationField.value = state.destination;
+        preferredDriverField.value = state.preferred_driver_id;
+        wheelchairField.value = state.wheelchair ? 'on' : '';
+        vulnerableField.value = state.vulnerable ? 'on' : '';
+        vivaPassField.value = state.viva_pass ? 'on' : '';
+        commandField.value = `Trajecte ${state.service_type || ''} de ${state.origin || ''} a ${state.destination || ''} amb ${state.preferred_driver_name || 'qualsevol conductor'}`.trim();
+        summaryTitleField.value = commandField.value;
+        supportNeedsFields.innerHTML = '';
+        state.support_needs.forEach((value) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'support_needs';
+          input.value = value;
+          supportNeedsFields.appendChild(input);
+        });
+      }
+
+      function parseServiceType(text) {
+        const normalized = normalizeText(text);
+        const aliases = { familia: 'Familia', salut: 'Salut', salud: 'Salut', cultura: 'Cultura', comunitat: 'Comunitat', comunidad: 'Comunitat', natura: 'Natura', naturaleza: 'Natura' };
+        const key = Object.keys(aliases).find((item) => normalized.includes(item));
+        return key ? aliases[key] : text.trim();
+      }
+
+      function parseDriver(text) {
+        const normalized = normalizeText(text);
+        const driver = drivers.find((item) => item.id !== 'any' && normalized.includes(normalizeText(item.name)));
+        if (driver) return driver;
+        return { id: 'any', name: 'Qualsevol conductor' };
+      }
+
+      function parseSupportNeeds(text) {
+        const normalized = normalizeText(text);
+        if (['no', 'nada', 'res', 'cap'].some((word) => normalized.includes(word))) return [];
+        const mapping = {
+          walk_assistance: ['caminar', 'andar', 'ajuda per caminar'],
+          accompany_home: ['casa', 'acompanar a casa', 'acompanyament'],
+          help_bags: ['bolsas', 'bosses', 'bossa', 'compra'],
+          wait_during_visit: ['espera', 'esperar', 'cita'],
+          phone_support: ['telefono', 'telefon', 'trucada'],
+        };
+        const selected = [];
+        Object.keys(mapping).forEach((key) => {
+          if (mapping[key].some((keyword) => normalized.includes(keyword))) selected.push(key);
+        });
+        return selected;
+      }
+
+      function finalizeStep(rawValue) {
+        const value = (rawValue || auraInput.value || '').trim();
+        if (!value) {
+          voiceStatus.textContent = 'Escriu o dicta una resposta abans de continuar.';
+          return;
+        }
+
+        const step = steps[state.index];
+        pushBubble('user', value, false);
+
+        if (step.key === 'service_type') {
+          state.service_type = parseServiceType(value);
+          pushBubble('assistant', `Perfecte. He guardat el servei ${state.service_type}.`, true);
+        } else if (step.key === 'origin') {
+          state.origin = value;
+          pushBubble('assistant', `Origen guardat: ${state.origin}.`, true);
+        } else if (step.key === 'destination') {
+          state.destination = value;
+          pushBubble('assistant', `Destinació guardada: ${state.destination}.`, true);
+        } else if (step.key === 'preferred_driver_id') {
+          const driver = parseDriver(value);
+          if (driver.busy) {
+            state.preferred_driver_id = 'any';
+            state.preferred_driver_name = 'Qualsevol conductor disponible';
+            pushBubble('assistant', `${driver.name} ara té una ruta activa. Quan la completi es podrà seleccionar; per aquesta reserva buscaré un conductor disponible.`, true);
+          } else {
+            state.preferred_driver_id = driver.id;
+            state.preferred_driver_name = driver.name;
+            pushBubble('assistant', `Conductor guardat: ${driver.name}.`, true);
+          }
+        } else if (step.key === 'wheelchair') {
+          state.wheelchair = isYes(value);
+          pushBubble('assistant', state.wheelchair ? 'He marcat vehicle adaptat.' : 'D’acord, sense vehicle adaptat.', true);
+        } else if (step.key === 'vulnerable') {
+          state.vulnerable = isYes(value);
+          pushBubble('assistant', state.vulnerable ? 'He marcat perfil vulnerable per aplicar ajuda.' : 'D’acord, no marco subvenció especial.', true);
+        } else if (step.key === 'viva_pass') {
+          state.viva_pass = isYes(value);
+          pushBubble('assistant', state.viva_pass ? 'He activat VIVA Pass per al càlcul.' : 'D’acord, sense VIVA Pass.', true);
+        } else if (step.key === 'support_needs') {
+          const parsedNeeds = parseSupportNeeds(value);
+          state.support_needs = Array.from(new Set([...state.support_needs, ...parsedNeeds]));
+          pushBubble('assistant', state.support_needs.length ? 'He guardat l’ajuda necessària per al conductor.' : 'D’acord, no cal ajuda extra.', true);
+        }
+
+        state.index += 1;
+        auraInput.value = '';
+        updateSummary();
+        syncHiddenFields();
+
+        if (state.index < steps.length) {
+          window.setTimeout(askCurrentStep, 450);
+        } else {
+          submitBtn.disabled = false;
+          const supportText = state.support_needs.length ? state.support_needs.map((item) => supportNeedLabels[item] || item).join(', ') : 'sense ajuda extra';
+          const finalLine = `Ho heu fet molt bé. Hem acabat: trajecte ${state.service_type} de ${state.origin} a ${state.destination}, amb ${state.preferred_driver_name}, ${supportText}. La reserva s'ha registrat automàticament.`;
+          pushBubble('assistant', finalLine, false);
+          voiceStatus.textContent = 'AURA està guardant la reserva.';
+          speak(finalLine, function () {
+            document.getElementById('aura-form').submit();
+          });
+        }
+      }
+
+      function askCurrentStep() {
+        const step = steps[state.index];
+        const question = `${step.question} ${step.helper}`;
+        pushBubble('assistant', question, true);
+        renderQuickReplies(step);
+        updateSummary();
+        auraInput.focus();
+        voiceStatus.textContent = step.helper;
+      }
+
+      function resetAura() {
+        window.speechSynthesis?.cancel();
+        Object.assign(state, {
+          started: true,
+          index: 0,
+          service_type: '',
+          origin: '',
+          destination: '',
+          preferred_driver_id: 'any',
+          preferred_driver_name: 'Qualsevol conductor',
+          wheelchair: false,
+          vulnerable: false,
+          viva_pass: false,
+          support_needs: [],
+        });
+        transcript.innerHTML = '';
+        submitBtn.disabled = true;
+        syncHiddenFields();
+        updateSummary();
+        askCurrentStep();
+      }
+
+      startBtn.addEventListener('click', function () {
+        state.started = true;
+        startPanel.hidden = true;
+        chatUi.classList.remove('is-disabled');
+        askCurrentStep();
+      });
+
+      clearBtn.addEventListener('click', resetAura);
+      nextBtn.addEventListener('click', function () { finalizeStep(); });
+      auraInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          finalizeStep();
+        }
+      });
+
+      if (!SpeechRecognition) {
+        voiceBtn.disabled = true;
+        voiceStatus.textContent = 'Aquest navegador no permet dictat per veu. Pots contestar amb text.';
+      } else {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'es-ES';
+        recognition.interimResults = false;
+        recognition.continuous = false;
+        recognition.addEventListener('start', function () {
+          voiceBtn.classList.add('is-listening');
+          voiceStatus.textContent = 'Escoltant la resposta actual.';
+        });
+        recognition.addEventListener('result', function (event) {
+          const transcriptText = event.results[0][0].transcript.trim();
+          if (transcriptText) {
+            auraInput.value = transcriptText;
+            voiceStatus.textContent = 'Resposta rebuda. Prem respondre o ajusta el text.';
+          }
+        });
+        recognition.addEventListener('end', function () {
+          voiceBtn.classList.remove('is-listening');
+        });
+        recognition.addEventListener('error', function () {
+          voiceStatus.textContent = 'No s’ha pogut reconèixer bé la veu. Torna-ho a provar o escriu la resposta.';
+        });
+        voiceBtn.addEventListener('click', function () {
+          try {
+            recognition.start();
+          } catch (error) {
+            voiceStatus.textContent = 'El dictat ja estava en marxa o no s’ha pogut iniciar.';
+          }
+        });
+      }
+
+      document.getElementById('aura-form').addEventListener('submit', syncHiddenFields);
+      syncHiddenFields();
+      updateSummary();
+    })();
+  </script>
+{% endblock %}

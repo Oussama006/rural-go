@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header compact-header">
+    <h2>Administración</h2>
+    <p>Registros de usuarios, conductores y documentos pendientes.</p>
+  </div>
+
+  <div class="stats-grid mb-4">
+    <div class="stat-card"><span>Usuarios</span><strong>{{ users|length }}</strong></div>
+    <div class="stat-card"><span>Conductores</span><strong>{{ drivers|length }}</strong></div>
+    <div class="stat-card"><span>Reservas</span><strong>{{ total_rides }}</strong></div>
+    <div class="stat-card"><span>Docs pendientes</span><strong>{{ pending_documents|length }}</strong></div>
+  </div>
+
+  <div class="panel-card mb-4 admin-toolbar">
+    <h5 class="mb-0">Control del sistema</h5>
+    <form method="post" action="/admin/run-migrations" class="m-0">
+      <button class="btn btn-sm btn-outline-primary" type="submit">Comprobar sistema</button>
+    </form>
+  </div>
+
+  <div class="panel-card mb-4">
+    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+      <h5 class="mb-0">Documentos pendientes</h5>
+      <span class="chip">{{ pending_documents|length }}</span>
+    </div>
+    {% if pending_documents %}
+      <div class="document-list">
+        {% for document in pending_documents %}
+          {% set owner = document_owners[document.id] %}
+          <div class="document-item admin-document-item">
+            <div>
+              <strong>{{ document.title }}</strong>
+              <span>{{ owner.full_name if owner else 'Usuario eliminado' }} · {{ document.original_filename }}</span>
+              <a class="btn btn-sm btn-outline-primary mt-2" href="{{ url_for('static', filename='uploads/documents/' ~ document.filename) }}" target="_blank">Ver documento</a>
+            </div>
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+              <form method="post" action="/admin/document/{{ document.id }}/review">
+                <input type="hidden" name="decision" value="approve">
+                <button class="btn btn-sm btn-success" type="submit">Validar</button>
+              </form>
+              <form method="post" action="/admin/document/{{ document.id }}/review">
+                <input type="hidden" name="decision" value="reject">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Rechazar</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">No hay documentos pendientes.</p>
+    {% endif %}
+  </div>
+
+  <div class="admin-user-grid">
+    {% for user in users %}
+      {% set detail = user_details[user.id] %}
+      <a class="admin-user-card" href="/admin/user/{{ user.id }}">
+        <div class="admin-user-avatar">
+          {% if user.profile_photo %}
+            <img src="{{ url_for('static', filename='uploads/profile_photos/' ~ user.profile_photo) }}" alt="Foto de {{ user.full_name }}">
+          {% else %}
+            <span>{{ user.full_name[:1]|upper }}</span>
+          {% endif %}
+        </div>
+        <div>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <strong>{{ user.full_name }}</strong>
+            <span class="presence-dot {% if detail.online %}online{% endif %}"></span>
+          </div>
+          <span>{{ user.username }}</span>
+          <div class="chip-grid mt-2">
+            <span class="chip">{{ user.role }}</span>
+            <span class="chip">{{ detail.rides_count }} reservas</span>
+            {% if detail.pending_documents_count %}
+              <span class="chip">{{ detail.pending_documents_count }} docs pendientes</span>
+            {% endif %}
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% endblock %}

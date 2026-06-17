@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block content %}
+  <section class="mobile-hero">
+    <div class="mobile-hero-copy">
+      <span class="eyebrow">Mobilitat sostenible per a zones rurals</span>
+      <h1>RURAL-GO VIVA</h1>
+      <p>Connectem comunitats rurals amb transport accessible, segur i de confiança per anar a salut, cultura, família, natura i serveis locals.</p>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-success" href="/login">Començar</a>
+        <a class="btn btn-primary" href="/services">Veure serveis</a>
+      </div>
+    </div>
+    <div class="mobile-hero-device" aria-hidden="true">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="">
+      <div class="device-line strong"></div>
+      <div class="device-line"></div>
+      <div class="device-actions">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-band">
+    <div class="section-heading">
+      <span class="eyebrow">Garantim</span>
+      <h2>Una experiència clara, humana i preparada per mòbil</h2>
+    </div>
+    <div class="feature-grid">
+      <article class="feature-tile">
+        <span class="feature-mark">01</span>
+        <h3>Transport accessible</h3>
+        <p>Vehicles adaptats i assistència visible abans de confirmar cada trajecte.</p>
+      </article>
+      <article class="feature-tile">
+        <span class="feature-mark">02</span>
+        <h3>Conductors verificats</h3>
+        <p>Assignació clara, seguiment de ruta i avisos per client, família i equip.</p>
+      </article>
+      <article class="feature-tile">
+        <span class="feature-mark">03</span>
+        <h3>Preus justos</h3>
+        <p>Tarifes transparents amb descomptes per Viva Pass i perfils vulnerables.</p>
+      </article>
+      <article class="feature-tile">
+        <span class="feature-mark">04</span>
+        <h3>Comunitat local</h3>
+        <p>Trajectes que també activen cultura, benestar i participació comunitària.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="content-band">
+    <div class="section-heading">
+      <span class="eyebrow">Serveis</span>
+      <h2>El desplaçament segons la necessitat real</h2>
+    </div>
+    <div class="catalog-strip">
+      {% for service in services %}
+        <article class="catalog-card">
+          <div class="catalog-card-head">
+            <span>{{ service.category }}</span>
+            <strong>{{ '%.2f'|format(service.base_fare) }} €</strong>
+          </div>
+          <h3>{{ service.name }}</h3>
+          <p>{{ service.description }}</p>
+          <div class="chip-grid">
+            {% for feature in service.features[:2] %}
+              <span class="chip">{{ feature }}</span>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+    <a class="btn btn-primary mt-3" href="/services">Obrir catàleg complet</a>
+  </section>
+
+  <section class="content-band">
+    <div class="section-heading">
+      <span class="eyebrow">Com funciona</span>
+      <h2>De la petició al seguiment en quatre passos</h2>
+    </div>
+    <div class="steps-grid">
+      <div class="step"><div class="step-number">1</div><h4>Sol·licita</h4><p>Indica origen, destí, servei i assistència.</p></div>
+      <div class="step"><div class="step-number">2</div><h4>Confirma</h4><p>Revisa detalls, distància i preu estimat.</p></div>
+      <div class="step"><div class="step-number">3</div><h4>Assignem</h4><p>El sistema avisa conductors i equip de control.</p></div>
+      <div class="step"><div class="step-number">4</div><h4>Segueix</h4><p>Consulta estat, missatges i arribada.</p></div>
+    </div>
+  </section>
+
+  <section class="content-band">
+    <div class="section-heading">
+      <span class="eyebrow">Domus Viva</span>
+      <h2>Activitats recomanades per convertir mobilitat en vida social</h2>
+    </div>
+    <div class="activity-grid">
+      {% for activity in activities %}
+        <article class="activity-card">
+          <div class="activity-card-head">
+            <strong>{{ activity.name }}</strong>
+            <span>{{ activity.rating }}/5</span>
+          </div>
+          <p>{{ activity.description }}</p>
+          <div class="activity-meta">
+            <span>{{ activity.location }}</span>
+            <span>{{ activity.duration }}</span>
+            <span>{% if activity.price == 0 %}Gratis{% else %}{{ activity.price }} €{% endif %}</span>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

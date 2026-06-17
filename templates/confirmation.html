@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header">
+    <h2>Confirmació</h2>
+    <p>La petició s'ha creat correctament. Aquí tens el resum i el seguiment.</p>
+  </div>
+  <div class="confirmation-shell">
+    <div class="confirmation-summary confirmation-box">
+      <div class="confirmation-title-row">
+        <div>
+          <span class="eyebrow">Petició registrada</span>
+          <h3 class="mb-1">Gràcies, {{ ride.requester }}</h3>
+          <p class="mb-0 text-muted">Ja tens el trajecte guardat al sistema.</p>
+        </div>
+        <span class="status-badge {% if ride.status == 'pending' %}status-pending{% else %}status-assigned{% endif %}">{{ ride.status }}</span>
+      </div>
+
+      <div class="summary-grid mt-3">
+        <div class="summary-item"><span>Tipus</span><strong>{{ ride.service_type }}</strong></div>
+        <div class="summary-item"><span>Preu estimat</span><strong>{{ ride.price }} €</strong></div>
+        <div class="summary-item"><span>Distància</span><strong>{% if ride.distance_km %}{{ ride.distance_km }} km{% else %}-{% endif %}</strong></div>
+        <div class="summary-item"><span>Conductor</span><strong>{{ assigned_driver.full_name if assigned_driver else 'pendent' }}</strong></div>
+        <div class="summary-item"><span>Vehicle</span><strong>{{ vehicle.name if vehicle else 'pendent' }}</strong></div>
+        <div class="summary-item"><span>Assistència</span><strong>{% if ride.support_needs %}{{ ride.support_needs.replace('|', ', ').replace('_', ' ') }}{% else %}Cap indicada{% endif %}</strong></div>
+      </div>
+
+      <div class="alert-box mt-3 mb-0">
+        <strong>Què passa ara?</strong>
+        <p class="mb-0">Pots seguir el trajecte, tornar al panell o crear un altre trajecte quan vulguis.</p>
+      </div>
+
+      {% if ride.status == 'completed' %}
+        <div class="alert-box mt-3 mb-0">
+          <strong>Trajecte completat</strong>
+          <p class="mb-0">El trajecte ha finalitzat. Rebrem la teva valoració per missatge.</p>
+        </div>
+      {% endif %}
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <a href="/dashboard" class="btn btn-primary">Anar al panell</a>
+        <a href="/book" class="btn btn-warning">Nou trajecte</a>
+        <a href="/track/{{ ride.id }}" class="btn btn-primary">Veure seguiment</a>
+      </div>
+    </div>
+
+    {% if tracker %}
+      <div class="tracking-board confirmation-track mt-3">
+        <div class="tracking-head confirmation-track-head">
+          <div>
+            <span class="eyebrow">Seguiment visual</span>
+            <h6 class="mb-0">{{ ride.origin }} → {{ ride.destination }}</h6>
+          </div>
+          <span class="status-badge {% if ride.status == 'pending' %}status-pending{% else %}status-assigned{% endif %}">{{ tracker.current_label }}</span>
+        </div>
+        <div class="stats-grid confirmation-stats mt-3 mb-0">
+          <div class="stat-card"><span>ETA</span><strong>{% if tracker.eta_minutes %}{{ tracker.eta_minutes }} min{% else %}-{% endif %}</strong></div>
+          <div class="stat-card"><span>Restant</span><strong>{% if tracker.distance_km %}{{ tracker.distance_km }} km{% else %}-{% endif %}</strong></div>
+          <div class="stat-card"><span>Total</span><strong>{% if tracker.route_distance_km %}{{ tracker.route_distance_km }} km{% else %}-{% endif %}</strong></div>
+          <div class="stat-card"><span>Conductor</span><strong>{{ assigned_driver.full_name if assigned_driver else 'pendent' }}</strong></div>
+          <div class="stat-card"><span>Vehicle</span><strong>{{ vehicle.name if vehicle else 'pendent' }}</strong></div>
+        </div>
+        <div class="tracker-bar" data-progress="{{ tracker.progress_percent }}"><span></span></div>
+        <div class="tracker-mini">
+          {% for step in tracker.steps %}
+            <div class="tracker-node {% if step.done %}done{% endif %} {% if step.active %}active{% endif %}">{{ step.label }}</div>
+          {% endfor %}
+        </div>
+        <div class="mt-3 small text-muted">
+          {% if assigned_driver %}Conductor: {{ assigned_driver.full_name }}{% endif %}
+          {% if vehicle %} · Vehicle: {{ vehicle.name }}{% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="tracking-board mt-4">
+      <div
+        id="confirmationMap"
+        class="map-view"
+        data-origin-lat="{{ tracker.location.latitude if tracker.location else tracker.origin_lat }}"
+        data-origin-lng="{{ tracker.location.longitude if tracker.location else tracker.origin_lng }}"
+        data-destination-lat="{{ tracker.destination_lat }}"
+        data-destination-lng="{{ tracker.destination_lng }}"
+      ></div>
+      <div class="small text-muted mt-2">Mapa real del trajecte amb actualització de posició per demo.</div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <script>
+    window.addEventListener('load', function () {
+      const mapElement = document.getElementById('confirmationMap');
+      if (!mapElement) return;
+      const originLat = parseFloat(mapElement.dataset.originLat || '41.54');
+      const originLng = parseFloat(mapElement.dataset.originLng || '1.62');
+      const destinationLat = parseFloat(mapElement.dataset.destinationLat || '41.55');
+      const destinationLng = parseFloat(mapElement.dataset.destinationLng || '1.63');
+      const rideId = {{ ride.id|tojson }};
+      const map = L.map('confirmationMap').setView([originLat, originLng], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      const startPoint = [originLat, originLng];
+      const destinationPoint = [destinationLat, destinationLng];
+      const carIcon = L.divIcon({
+        className: 'car-live-marker',
+        html: '<span></span>',
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      });
+      const carMarker = L.marker(startPoint, { icon: carIcon }).addTo(map).bindPopup('Posició actual');
+      L.marker(destinationPoint).addTo(map).bindPopup('Destí');
+      const line = L.polyline([startPoint, destinationPoint], { color: '#64748b', weight: 4, dashArray: '8,10' }).addTo(map);
+      const travelledLine = L.polyline([startPoint, startPoint], { color: '#16a34a', weight: 5 }).addTo(map);
+      map.fitBounds(line.getBounds(), { padding: [24, 24] });
+      async function refreshConfirmationMap() {
+        const response = await fetch(`/api/track/${rideId}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data.location || data.location.latitude == null || data.location.longitude == null) return;
+        const currentPoint = [data.location.latitude, data.location.longitude];
+        carMarker.setLatLng(currentPoint);
+        line.setLatLngs([currentPoint, destinationPoint]);
+        travelledLine.setLatLngs([startPoint, currentPoint]);
+        map.fitBounds(line.getBounds(), { padding: [24, 24] });
+      }
+      refreshConfirmationMap();
+      setInterval(refreshConfirmationMap, 10000);
+    });
+  </script>
+  <script>
+    window.addEventListener('load', function () {
+      const progressBar = document.querySelector('#confirmationMap')?.closest('.tracking-board')?.querySelector('.tracker-bar[data-progress] span');
+      if (progressBar) {
+        const progressValue = parseFloat(progressBar.parentElement.dataset.progress || '0');
+        progressBar.style.width = `${progressValue}%`;
+      }
+    });
+  </script>
+{% endblock %}

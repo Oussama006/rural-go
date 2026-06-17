@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header">
+    {% if dashboard_mode == 'driver' %}
+      <span class="eyebrow">Conductor</span>
+      <h2>Panell de conductor</h2>
+      <p>Les rutes assignades, els avisos i l'estat operatiu del dia.</p>
+    {% elif dashboard_mode == 'staff' %}
+      <span class="eyebrow">Control</span>
+      <h2>Centre d'operacions</h2>
+      <p>Gestió global de trajectes, assignacions i seguiment del servei.</p>
+    {% else %}
+      <span class="eyebrow">Client</span>
+      <h2>Panell d'usuari</h2>
+      <p>Reserves, missatges i AURA.</p>
+    {% endif %}
+  </div>
+
+  <div class="stats-grid mb-4">
+    {% if dashboard_mode == 'driver' %}
+      <div class="stat-card"><span>Trajectes assignats</span><strong>{{ total_rides }}</strong></div>
+      <div class="stat-card"><span>Actius</span><strong>{{ active_rides }}</strong></div>
+      <div class="stat-card"><span>Completats</span><strong>{{ finished_rides }}</strong></div>
+      <div class="stat-card"><span>No llegits</span><strong>{{ inbox_messages|length }}</strong></div>
+    {% elif dashboard_mode == 'staff' %}
+      <div class="stat-card"><span>Total</span><strong>{{ total_rides }}</strong></div>
+      <div class="stat-card"><span>Pendents</span><strong>{{ pending_rides }}</strong></div>
+      <div class="stat-card"><span>Assignats</span><strong>{{ assigned_rides }}</strong></div>
+      <div class="stat-card"><span>No llegits</span><strong>{{ inbox_messages|length }}</strong></div>
+    {% else %}
+      <div class="stat-card"><span>Reserves</span><strong>{{ total_rides }}</strong></div>
+      <div class="stat-card"><span>Pendents</span><strong>{{ pending_rides }}</strong></div>
+      <div class="stat-card"><span>Assignats</span><strong>{{ assigned_rides }}</strong></div>
+      <div class="stat-card"><span>No llegits</span><strong>{{ inbox_messages|length }}</strong></div>
+    {% endif %}
+  </div>
+
+  {% if dashboard_mode == 'family' %}
+    <div class="experience-grid mb-4">
+      <div class="experience-card experience-card-strong">
+        <span class="eyebrow">Pròxim pas</span>
+        <h5>Nova reserva</h5>
+        <p>Escull servei, origen i destinació.</p>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <a class="btn btn-sm btn-warning" href="/book">Nova reserva</a>
+          <a class="btn btn-sm btn-primary" href="/aura">Parlar amb AURA</a>
+        </div>
+      </div>
+      <div class="experience-card">
+        <span class="eyebrow">Serveis recomanats</span>
+        <div class="mini-service-list">
+          {% for service in service_catalog[:3] %}
+            <a href="/book?service_type={{ service.service_type }}">
+              <strong>{{ service.category }}</strong>
+              <span>{{ service.response_time }} · des de {{ '%.2f'|format(service.base_fare) }} €</span>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="experience-card">
+        <span class="eyebrow">Confiança</span>
+        <ul class="simple-list mb-0">
+          <li>Missatges automàtics quan canvia l'estat.</li>
+          <li>Seguiment visual del trajecte.</li>
+          <li>Assistència marcada abans de sortir.</li>
+        </ul>
+      </div>
+    </div>
+  {% elif dashboard_mode == 'driver' %}
+    <div class="experience-grid mb-4">
+      <div class="experience-card experience-card-strong">
+        <span class="eyebrow">Torn actiu</span>
+        <h5>Prioritza seguretat i comunicació</h5>
+        <p>Accepta només una ruta cada vegada, revisa assistència i mantén el client informat amb els canvis d'estat.</p>
+        <a class="btn btn-sm btn-success mt-2" href="/driver">Obrir ruta operativa</a>
+      </div>
+      <div class="experience-card">
+        <span class="eyebrow">Checklist</span>
+        <ul class="simple-list mb-0">
+          <li>Confirmar origen i telèfon del client.</li>
+          <li>Revisar cadira de rodes o ajuda especial.</li>
+          <li>Marcar “Ha sortit” i “Ha arribat”.</li>
+        </ul>
+      </div>
+      <div class="experience-card">
+        <span class="eyebrow">Qualitat</span>
+        <div class="mini-kpi-list">
+          <div><span>Actives</span><strong>{{ active_rides }}</strong></div>
+          <div><span>Finalitzades</span><strong>{{ finished_rides }}</strong></div>
+          <div><span>Avisos</span><strong>{{ inbox_messages|length }}</strong></div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="panel-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          {% if dashboard_mode == 'driver' %}
+            <h5 class="mb-0">Rutes del conductor</h5>
+            <a class="btn btn-sm btn-primary" href="/driver">Obrir panell</a>
+          {% elif dashboard_mode == 'staff' %}
+            <h5 class="mb-0">Rutes del servei</h5>
+            <a class="btn btn-sm btn-primary" href="/admin">Obrir admin</a>
+          {% else %}
+          <h5 class="mb-0">Historial de reserves</h5>
+          <a class="btn btn-sm btn-primary" href="/book">Nova reserva</a>
+          {% endif %}
+        </div>
+
+        {% if latest_ride and latest_tracker %}
+          <div class="tracking-board mb-3">
+            <div class="tracking-head">
+              <div>
+                <span class="eyebrow">Seguiment</span>
+                <h6 class="mb-0">{{ latest_ride.origin }} → {{ latest_ride.destination }}</h6>
+              </div>
+              <span class="status-badge {% if latest_ride.status == 'pending' %}status-pending{% else %}status-assigned{% endif %}">{{ latest_tracker.current_label }}</span>
+            </div>
+            <div class="tracker-bar"><span style="width: {{ latest_tracker.progress_percent }}%;"></span></div>
+            <div class="tracker-mini">
+              {% for step in latest_tracker.steps %}
+                <div class="tracker-node {% if step.done %}done{% endif %} {% if step.active %}active{% endif %}">{{ step.label }}</div>
+              {% endfor %}
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-3">
+              <small class="text-muted">Vehicle: {{ latest_ride.assigned_vehicle or 'pendent' }}</small>
+              <a class="btn btn-sm btn-primary" href="/track/{{ latest_ride.id }}">Obrir seguiment</a>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if inbox_messages %}
+          <div class="alert-box mb-3">
+            <h6>Missatges no llegits</h6>
+            <div class="email-list">
+              {% for message in inbox_messages %}
+                <div class="email-item {% if not message.seen %}unread{% endif %} message-item" data-message-id="{{ message.id }}" data-ride-id="{{ message.ride_id or '' }}" data-title="{{ message.title|e }}" data-body="{{ message.body|e }}">
+                  <div class="email-marker" aria-hidden></div>
+                  <div>
+                    <div class="email-sender">{{ message.sender_role|capitalize or 'Sistema' }}</div>
+                    <div class="email-subject">{{ message.title }}</div>
+                    <div class="email-excerpt">{{ message.body[:100] }}{% if message.body|length > 100 %}…{% endif %}</div>
+                  </div>
+                  <div class="email-meta">
+                    <div class="small text-muted">{{ message.created_at.strftime('%d/%m/%Y') }}</div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        {% if dashboard_mode == 'family' and alerts %}
+          <div class="alert-box mb-3">
+            <h6>Alertes i oportunitats</h6>
+            <ul class="simple-list mb-0">
+              {% for alert in alerts %}
+                <li>{{ alert }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        <div class="quick-actions mb-3">
+          {% if dashboard_mode == 'driver' %}
+            <a class="quick-action" href="/driver"><strong>Conductor</strong><span>Veure les teves rutes</span></a>
+            <a class="quick-action" href="/messages"><strong>Missatges</strong><span>Novetats de rutes i control</span></a>
+            <a class="quick-action" href="/rides"><strong>Trajectes</strong><span>Històric de les teves assignacions</span></a>
+          {% elif dashboard_mode == 'admin' %}
+            <a class="quick-action" href="/admin"><strong>Admin</strong><span>Assignar i supervisar tot</span></a>
+            <a class="quick-action" href="/messages"><strong>Missatges</strong><span>Sol·licituds i avisos interns</span></a>
+            <a class="quick-action" href="/reports"><strong>Informes</strong><span>KPIs i impacte social</span></a>
+          {% else %}
+            <a class="quick-action" href="/book"><strong>Reservar</strong><span>Crear una reserva</span></a>
+            <a class="quick-action" href="/aura"><strong>AURA</strong><span>Ajuda ràpida</span></a>
+            <a class="quick-action" href="/messages"><strong>Missatges</strong><span>Xat i avisos</span></a>
+          {% endif %}
+        </div>
+
+        {% if primary_rides %}
+          <div class="ride-list">
+            {% for ride in primary_rides %}
+              <div class="ride-item">
+                <div>
+                  <strong>{{ ride.service_type }}</strong>
+                  <div class="text-muted small">{{ ride.origin }} → {{ ride.destination }}</div>
+                </div>
+                <div class="text-end">
+                  <span class="status-badge {% if ride.status == 'pending' %}status-pending{% else %}status-assigned{% endif %}">{{ ride.status }}</span>
+                  <div class="small mt-1">{{ ride.price }} €</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">Encara no hi ha trajectes per mostrar.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="panel-card accent-card">
+        <span class="eyebrow">Perfil</span>
+        <h5>{{ current_user.role|upper }}</h5>
+        <p class="mb-2">{{ current_user.username }}</p>
+        <p class="mb-0">{{ current_user.phone }}</p>
+        <a class="btn btn-sm btn-primary mt-3" href="/profile">Editar perfil</a>
+      </div>
+
+      <div class="panel-card mt-4">
+        <h5 class="mb-3">Resum de servei</h5>
+        <div class="chip-grid">
+          <span class="chip">Cultura: {{ culture_rides }}</span>
+          <span class="chip">Família: {{ family_rides }}</span>
+          <span class="chip">Salut: {{ health_rides }}</span>
+          <span class="chip">Comunitat: {{ community_rides }}</span>
+          <span class="chip">Natura: {{ nature_rides }}</span>
+        </div>
+      </div>
+
+      {% if recommendations %}
+        <div class="panel-card mt-4">
+          <h5 class="mb-3">Recomanacions</h5>
+          <ul class="simple-list mb-0">
+            {% for recommendation in recommendations %}
+              <li>{{ recommendation }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      {% if dashboard_mode == 'admin' %}
+        <div class="panel-card mt-4">
+          <h5 class="mb-3">Control ràpid</h5>
+          <ul class="simple-list mb-0">
+            <li>El panell d'administració és l'espai per assignar i supervisar.</li>
+            <li>Els missatges arriben quan es crea o s'actualitza un trajecte.</li>
+            <li>Els conductors només veuen les rutes que tenen assignades.</li>
+          </ul>
+        </div>
+      {% elif dashboard_mode == 'driver' %}
+        <div class="panel-card mt-4">
+          <h5 class="mb-3">Recordatori operatiu</h5>
+          <ul class="simple-list mb-0">
+            <li>Revisa els avisos nous abans de començar el torn.</li>
+            <li>Quan posis un trajecte en ruta, el client rep el missatge automàtic.</li>
+            <li>Actualitza l'estat quan arribis a destí.</li>
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

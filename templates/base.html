@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="{{ current_lang|default('ca') }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#111827">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Rural-GO">
+    <title>Rural-GO</title>
+    <link rel="manifest" href="{{ url_for('webmanifest') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+  </head>
+  {% set user_role = current_user.role if current_user else '' %}
+  {% set has_active_driver_route = driver_has_active_route|default(false) %}
+  {% set active_driver_ride_id = driver_active_ride_id|default('') %}
+  <body
+    data-user-role="{{ user_role }}"
+    data-driver-has-active-route="{{ 1 if has_active_driver_route else 0 }}"
+    data-driver-active-ride-id="{{ active_driver_ride_id }}"
+  >
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="/">
+          <img class="brand-logo" src="{{ url_for('static', filename='logo.png') }}" alt="Rural-GO logo">
+          <span>RURAL-GO</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Menú">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav me-auto">
+            {% if current_user %}
+              <li class="nav-item"><a class="nav-link" href="/dashboard">{{ _('Home') }}</a></li>
+              <li class="nav-item"><a class="nav-link" href="/profile">{{ _('Profile') }}</a></li>
+              <li class="nav-item">
+                <a class="nav-link nav-message-link" href="/messages">
+                  {{ _('Messages') }}
+                  {% if unread_count and unread_count > 0 %}
+                    <span class="message-counter">{{ unread_count }} {{ _('Pending')|lower }}</span>
+                  {% endif %}
+                </a>
+              </li>
+              {% if current_user.role in ['family', 'admin'] %}
+                <li class="nav-item"><a class="nav-link" href="/book">Reservar</a></li>
+                <li class="nav-item"><a class="nav-link" href="/aura">AURA</a></li>
+              {% endif %}
+              <li class="nav-item"><a class="nav-link" href="/services">{{ _('Services') }}</a></li>
+              {% if current_user.role in ['family', 'driver', 'admin'] %}
+                <li class="nav-item"><a class="nav-link" href="/rides">{{ _('History') }}</a></li>
+              {% endif %}
+              {% if current_user.role == 'driver' %}
+                <li class="nav-item"><a class="nav-link" href="/driver">{{ _('Driver') }}</a></li>
+              {% endif %}
+              {% if current_user.role in ['admin'] %}
+                <li class="nav-item"><a class="nav-link" href="/admin">{{ _('Admin') }}</a></li>
+                <li class="nav-item"><a class="nav-link" href="/reports">Informes</a></li>
+              {% endif %}
+{% else %}
+               <li class="nav-item"><a class="nav-link" href="/login">{% if current_lang == 'es' %}Entrar{% else %}Entrar{% endif %}</a></li>
+               <li class="nav-item"><a class="nav-link" href="/register">{% if current_lang == 'es' %}Registrarse{% else %}Registrar-se{% endif %}</a></li>
+             {% endif %}
+          </ul>
+          <div class="d-flex align-items-center gap-2">
+            {% if current_user %}
+              <span class="user-pill">{{ current_user.full_name }} · {{ current_user.role }}</span>
+              <div class="language-switch" aria-label="Idioma">
+                <a class="{% if current_lang == 'ca' %}active{% endif %}" href="/language/ca">CA</a>
+                <a class="{% if current_lang == 'es' %}active{% endif %}" href="/language/es">ES</a>
+              </div>
+              <a class="btn btn-sm btn-danger" href="/logout">{{ _('Logout') }}</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </nav>
+    <main class="container app-shell py-4">
+      {% if current_user and request.path not in ['/', '/login', '/register', '/dashboard'] %}
+        <div class="mb-3">
+          <a id="backBtn" class="btn btn-sm btn-outline-secondary back-link" href="#">{{ _('Back') }}</a>
+        </div>
+      {% endif %}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} flash-alert" role="alert">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+    {% if current_user %}
+      <nav class="app-tabbar" aria-label="Navegació principal mòbil">
+        <a class="app-tabbar-item {% if request.path == '/dashboard' %}active{% endif %}" href="/dashboard">
+          <span class="tab-icon" aria-hidden="true">⌂</span>
+          <span>{{ _('Home') }}</span>
+        </a>
+        {% if current_user.role == 'driver' %}
+          <a class="app-tabbar-item {% if request.path.startswith('/driver') %}active{% endif %}" href="/driver">
+            <span class="tab-icon" aria-hidden="true">▣</span>
+            <span>{{ _('Driver') }}</span>
+          </a>
+        {% elif current_user.role == 'admin' %}
+          <a class="app-tabbar-item {% if request.path.startswith('/admin') %}active{% endif %}" href="/admin">
+            <span class="tab-icon" aria-hidden="true">▦</span>
+            <span>{{ _('Admin') }}</span>
+          </a>
+        {% else %}
+          <a class="app-tabbar-item {% if request.path == '/book' %}active{% endif %}" href="/book">
+            <span class="tab-icon" aria-hidden="true">＋</span>
+            <span>Reservar</span>
+          </a>
+        {% endif %}
+        <a class="app-tabbar-item {% if request.path == '/messages' %}active{% endif %}" href="/messages">
+          <span class="tab-icon" aria-hidden="true">✉</span>
+          <span>{{ _('Messages') }}</span>
+          {% if unread_count and unread_count > 0 %}
+            <span class="tab-badge">{{ unread_count }}</span>
+          {% endif %}
+        </a>
+        <a class="app-tabbar-item {% if request.path == '/rides' %}active{% endif %}" href="/rides">
+          <span class="tab-icon" aria-hidden="true">≡</span>
+          <span>{{ _('History') }}</span>
+        </a>
+        <a class="app-tabbar-item {% if request.path == '/profile' %}active{% endif %}" href="/profile">
+          <span class="tab-icon" aria-hidden="true">◉</span>
+          <span>{{ _('Profile') }}</span>
+        </a>
+      </nav>
+    {% endif %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Global message modal and helper script (available on all pages) -->
+    <div class="modal fade" id="messageModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalTitle">{{ _('Message') }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ _('Back') }}"></button>
+          </div>
+          <div class="modal-body">
+            <div class="small text-muted mb-2" id="modalCreatedAt"></div>
+            <div id="modalStatusNote" class="small text-warning mb-2"></div>
+          <div id="modalBody"></div>
+          <div id="modalRatingArea" class="mt-3" style="display:none;">
+            <div class="small text-muted mb-2">Com va el trajecte? Puntua la teva experiència.</div>
+            <form id="ratingInlineForm" data-ride-id="">
+              <input type="hidden" name="ride_id" value="">
+              <div class="rating-stars" data-stars="0">
+                <button class="rating-star" type="button" data-score="1" aria-label="1 estrella">★</button>
+                <button class="rating-star" type="button" data-score="2" aria-label="2 estrelles">★</button>
+                <button class="rating-star" type="button" data-score="3" aria-label="3 estrelles">★</button>
+                <button class="rating-star" type="button" data-score="4" aria-label="4 estrelles">★</button>
+                <button class="rating-star" type="button" data-score="5" aria-label="5 estrelles">★</button>
+                <input type="hidden" name="score" value="0">
+              </div>
+              <textarea class="form-control mt-2" name="comment" rows="2" placeholder="Comentari opcional"></textarea>
+              <button class="btn btn-sm btn-primary mt-2" type="submit">Enviar valoració</button>
+            </form>
+          </div>
+          <hr>
+            <div id="modalClientInfo" class="mb-3 text-muted"></div>
+
+            <div id="modalActions" class="d-flex gap-2">
+              <form id="acceptForm" method="post" style="display:none;"></form>
+              <form id="rejectForm" method="post" style="display:none;"></form>
+            </div>
+
+            <div id="replySection" class="mt-3" style="display:none;">
+              <form id="replyForm" method="post">
+                <label class="form-label">{{ _('Reply') }}</label>
+                <textarea class="form-control mb-2" name="body" rows="3"></textarea>
+                <button class="btn btn-success" type="submit">{{ _('Send reply') }}</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const modalEl = document.getElementById('messageModal');
+        if (!modalEl || typeof bootstrap === 'undefined') return;
+        const bsModal = new bootstrap.Modal(modalEl);
+        const bodyEl = document.body;
+        const userRole = bodyEl.dataset.userRole || '';
+        const driverHasActiveRoute = bodyEl.dataset.driverHasActiveRoute === '1';
+        const modalStatusNote = document.getElementById('modalStatusNote');
+        const supportNeedLabels = {
+          walk_assistance: 'Ajuda per caminar',
+          accompany_home: 'Acompanyament fins a casa',
+          help_bags: 'Ajudar amb les bosses',
+          wait_during_visit: 'Espera durant la cita',
+          phone_support: 'Acompanyament telefònic',
+        };
+
+        const adjustCount = (elementId, delta) => {
+          const element = document.getElementById(elementId);
+          if (!element) return;
+          const current = parseInt(element.textContent, 10);
+          if (Number.isNaN(current)) return;
+          element.textContent = Math.max(0, current + delta);
+        };
+
+        const moveMessageItem = (item, targetListId) => {
+          const targetList = document.getElementById(targetListId);
+          if (!targetList || item.parentElement === targetList) return;
+          targetList.querySelectorAll('.empty-message').forEach((empty) => empty.remove());
+          targetList.appendChild(item);
+        };
+
+        const setupRatingForm = (form) => {
+          if (!form) return;
+          form.dataset.ratingReady = '1';
+          const rideId = form.dataset.rideId || form.querySelector('input[name="ride_id"]')?.value || '';
+          if (rideId && !form.getAttribute('action')) form.action = `/ride/${rideId}/rate`;
+          if (!form.getAttribute('method')) form.method = 'post';
+          if (form.dataset.ratingReady === '1' && form.dataset.ratingBound === '1') return;
+          form.dataset.ratingBound = '1';
+          const formStars = form.querySelectorAll('.rating-star');
+          const scoreInput = form.querySelector('input[name="score"]');
+          const setActiveStar = (idx) => {
+            formStars.forEach((btn, i) => btn.classList.toggle('active', i <= idx));
+            if (scoreInput) scoreInput.value = idx + 1;
+          };
+          formStars.forEach((btn, idx) => {
+            btn.addEventListener('click', (event) => {
+              event.stopPropagation();
+              setActiveStar(idx);
+            });
+            btn.addEventListener('mouseenter', () => {
+              formStars.forEach((b, i) => b.classList.toggle('hover', i <= idx));
+            });
+            btn.addEventListener('mouseleave', () => {
+              formStars.forEach((b) => b.classList.remove('hover'));
+              const current = parseInt(scoreInput?.value || 0, 10);
+              formStars.forEach((b, i) => b.classList.toggle('active', i < current));
+            });
+          });
+          form.addEventListener('click', (event) => event.stopPropagation());
+          form.addEventListener('submit', (event) => {
+            const score = parseInt(scoreInput?.value || 0, 10);
+            if (!score) {
+              event.preventDefault();
+              alert('Tria una puntuació abans d’enviar la valoració.');
+            }
+          });
+        };
+
+        document.querySelectorAll('.rating-inline-form').forEach(setupRatingForm);
+
+        document.body.addEventListener('click', async function (e) {
+          if (e.target.closest('a, button, form, input, textarea, select, label')) return;
+          const item = e.target.closest('.message-item');
+          if (!item) return;
+          const msgId = item.dataset.messageId;
+          const rideId = item.dataset.rideId;
+          const title = item.dataset.title;
+          const body = item.dataset.body;
+          const category = item.dataset.category || 'info';
+          const createdAt = item.dataset.createdAt || item.dataset.created_at || '';
+
+          try {
+            const wasUnread = item.classList.contains('unread');
+            const res = await fetch(`/message/${msgId}/mark_read`, { method: 'POST' });
+            if (!res.ok) throw new Error(`mark_read ${res.status}`);
+            if (wasUnread) {
+              item.classList.remove('unread');
+              item.classList.add('read');
+              moveMessageItem(item, 'readMessagesList');
+              adjustCount('unreadMessagesCount', -1);
+              adjustCount('readMessagesCount', 1);
+              const counter = document.querySelector('.message-counter');
+              if (counter) {
+                const n = parseInt(counter.textContent, 10) || 0;
+                if (n > 1) counter.textContent = `${n - 1} pendents`;
+                else counter.remove();
+              }
+            }
+          } catch (err) { console.warn('mark read failed', err); }
+
+          document.getElementById('modalTitle').textContent = title;
+          document.getElementById('modalBody').textContent = body;
+          document.getElementById('modalCreatedAt').textContent = createdAt;
+          const ratingArea = document.getElementById('modalRatingArea');
+          const ratingForm = document.getElementById('ratingInlineForm');
+          if (category === 'rating') {
+            ratingArea.style.display = 'block';
+            if (ratingForm) {
+              ratingForm.action = `/ride/${rideId || ''}/rate`;
+              ratingForm.dataset.rideId = rideId || '';
+              ratingForm.querySelector('input[name="ride_id"]').value = rideId || '';
+              const scoreInput = ratingForm.querySelector('input[name="score"]');
+              if (scoreInput) scoreInput.value = 0;
+              ratingForm.querySelectorAll('.rating-star').forEach((star) => star.classList.remove('active', 'hover'));
+              setupRatingForm(ratingForm);
+            }
+          } else {
+            ratingArea.style.display = 'none';
+          }
+
+          const clientInfo = document.getElementById('modalClientInfo');
+          const acceptForm = document.getElementById('acceptForm');
+          const rejectForm = document.getElementById('rejectForm');
+          const replySection = document.getElementById('replySection');
+
+          if (modalStatusNote) modalStatusNote.textContent = '';
+          acceptForm.style.display = 'none';
+          rejectForm.style.display = 'none';
+          replySection.style.display = 'none';
+
+          if (rideId) {
+            try {
+              const res = await fetch(`/api/ride/${rideId}`);
+              if (res.ok) {
+                const ride = await res.json();
+                const supportText = Array.isArray(ride.support_needs) && ride.support_needs.length
+                  ? ride.support_needs.map((item) => supportNeedLabels[item] || item).join(', ')
+                  : 'sense ajuda indicada';
+                const distanceText = ride.distance_km ? `${ride.distance_km} km` : 'pendent';
+                clientInfo.innerHTML = `<strong>Client:</strong> ${ride.requester} · ${ride.phone}<br><strong>Ruta:</strong> ${ride.origin} → ${ride.destination}<br><strong>Assistència:</strong> ${supportText}<br><strong>Distància:</strong> ${distanceText}`;
+                const replyForm = document.getElementById('replyForm');
+                replyForm.action = `/chat/${rideId}`;
+                if (ride.status === 'pending') {
+                  const canAccept = !(userRole === 'driver' && driverHasActiveRoute);
+                  if (userRole === 'driver' && canAccept) {
+                    acceptForm.style.display = 'inline-block';
+                    acceptForm.action = `/driver/ride/${rideId}/decision`;
+                    acceptForm.innerHTML = '<input type="hidden" name="decision" value="accept"><button class="btn btn-success" type="submit">Acceptar ruta</button>';
+                  } else if (userRole === 'driver' && modalStatusNote) {
+                    modalStatusNote.textContent = 'Tens una ruta activa. No pots acceptar una altra fins que no la completis.';
+                  }
+                  if (userRole === 'driver') {
+                    rejectForm.style.display = 'inline-block';
+                    rejectForm.action = `/driver/ride/${rideId}/decision`;
+                    rejectForm.innerHTML = '<input type="hidden" name="decision" value="reject"><button class="btn btn-outline-danger" type="submit">Rebutjar ruta</button>';
+                  }
+                }
+                replySection.style.display = 'block';
+              } else {
+                clientInfo.textContent = 'No s’ha pogut recuperar la informació del trajecte.';
+              }
+            } catch (err) { clientInfo.textContent = 'Error carregant client.'; }
+          } else {
+            clientInfo.innerHTML = '<em>Missatge sense trajecte associat.</em>';
+          }
+
+          bsModal.show();
+        });
+      });
+    </script>
+    <script>
+      // Smart back button: if referrer is empty or comes from login/register/index, fallback to /dashboard
+      (function () {
+        const backBtn = document.getElementById('backBtn');
+        if (!backBtn) return;
+        backBtn.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          try {
+            const ref = document.referrer;
+            if (!ref) return window.location.href = '/dashboard';
+            const refUrl = new URL(ref);
+            const sameOrigin = refUrl.origin === location.origin;
+            if (!sameOrigin) return window.location.href = '/dashboard';
+            const badPaths = ['/', '/login', '/register'];
+            if (badPaths.includes(refUrl.pathname)) return window.location.href = '/dashboard';
+            // otherwise try history.back()
+            history.back();
+            // if nothing happens after short delay, redirect to dashboard
+            setTimeout(function () {
+              if (location.pathname === refUrl.pathname) window.location.href = '/dashboard';
+            }, 250);
+          } catch (e) {
+            window.location.href = '/dashboard';
+          }
+        });
+      })();
+    </script>
+	    <script>
+	      (function () {
+	        const currentLang = {{ current_lang|default('ca')|tojson }};
+	        const dictionaries = {
+	          es: {
+	            'Inici': 'Inicio',
+	            'Perfil': 'Perfil',
+	            'Missatges': 'Mensajes',
+	            'Serveis': 'Servicios',
+	            'Històric': 'Histórico',
+	            'Sortir': 'Salir',
+	            'Tornar': 'Volver',
+	            'Missatge': 'Mensaje',
+	            'Respondre': 'Responder',
+	            'Enviar resposta': 'Enviar respuesta',
+	            'Acceptar ruta': 'Aceptar ruta',
+	            'Rebutjar ruta': 'Rechazar ruta',
+	            'Bústia': 'Buzón',
+	            'No llegits': 'No leídos',
+	            'Llegits': 'Leídos',
+	            'No tens missatges pendents.': 'No tienes mensajes pendientes.',
+	            'Encara no hi ha missatges llegits.': 'Todavía no hay mensajes leídos.',
+	            'Confirmacions i xat de cada reserva.': 'Confirmaciones y chat de cada reserva.',
+	            'Escriu un missatge': 'Escribe un mensaje',
+	            'Veure': 'Ver',
+	            'Obrir xat': 'Abrir chat',
+	            'Nova reserva': 'Nueva reserva',
+	            'Reserves': 'Reservas',
+	            'Seguiment': 'Seguimiento',
+	            'Seguiment visual': 'Seguimiento visual',
+	            'Veure seguiment': 'Ver seguimiento',
+	            'Nou trajecte': 'Nuevo trayecto',
+	            'Anar al panell': 'Ir al panel',
+	            'Assignat': 'Asignado',
+	            'Sol·licitat': 'Solicitado',
+	            'Completat': 'Completado',
+	            'pendent': 'pendiente',
+	            'Pendent': 'Pendiente',
+	            'Client': 'Cliente',
+	            'Telèfon': 'Teléfono',
+	            'Vehicle': 'Vehículo',
+	            'Assistència': 'Asistencia',
+	            'Distància': 'Distancia',
+	            'Preu estimat': 'Precio estimado',
+	            'Conductor preferit': 'Conductor preferido',
+	            'Qualsevol conductor disponible': 'Cualquier conductor disponible',
+	            'Enviar sol·licitud': 'Enviar solicitud',
+	            'Destinació': 'Destino',
+	            'Tipus de servei': 'Tipo de servicio',
+	            'Nom': 'Nombre',
+	            'Rutes actuals': 'Rutas actuales',
+	            'Actuals': 'Actuales',
+	            'Pendents': 'Pendientes',
+	            'Assignades': 'Asignadas',
+	            'Detalls': 'Detalles',
+	            'Acceptar': 'Aceptar',
+	            'Rebutjar': 'Rechazar',
+	            'Ha sortit': 'Ha salido',
+	            'Ha arribat': 'Ha llegado',
+	            'Avançar ubicació': 'Avanzar ubicación',
+	            'Administración': 'Administración',
+	            'Registros de usuarios, conductores y documentos pendientes.': 'Registros de usuarios, conductores y documentos pendientes.',
+	            'Historial de reservas': 'Historial de reservas',
+	            'Històric de trajectes': 'Histórico de trayectos'
+	          },
+	          ca: {
+	            'Inicio': 'Inici',
+	            'Mensajes': 'Missatges',
+	            'Servicios': 'Serveis',
+	            'Historial': 'Històric',
+	            'Histórico': 'Històric',
+	            'Salir': 'Sortir',
+	            'Volver': 'Tornar',
+	            'Mensaje': 'Missatge',
+	            'Responder': 'Respondre',
+	            'Enviar respuesta': 'Enviar resposta',
+	            'Aceptar ruta': 'Acceptar ruta',
+	            'Rechazar ruta': 'Rebutjar ruta',
+	            'Buzón': 'Bústia',
+	            'No leídos': 'No llegits',
+	            'Leídos': 'Llegits',
+	            'No tienes mensajes pendientes.': 'No tens missatges pendents.',
+	            'Todavía no hay mensajes leídos.': 'Encara no hi ha missatges llegits.',
+	            'Confirmaciones y chat de cada reserva.': 'Confirmacions i xat de cada reserva.',
+	            'Escribe un mensaje': 'Escriu un missatge',
+	            'Ver': 'Veure',
+	            'Abrir chat': 'Obrir xat',
+	            'Nueva reserva': 'Nova reserva',
+	            'Reservas': 'Reserves',
+	            'Seguimiento': 'Seguiment',
+	            'Seguimiento visual': 'Seguiment visual',
+	            'Ver seguimiento': 'Veure seguiment',
+	            'Nuevo trayecto': 'Nou trajecte',
+	            'Ir al panel': 'Anar al panell',
+	            'Asignado': 'Assignat',
+	            'Solicitado': 'Sol·licitat',
+	            'Completado': 'Completat',
+	            'pendiente': 'pendent',
+	            'Pendiente': 'Pendent',
+	            'Cliente': 'Client',
+	            'Teléfono': 'Telèfon',
+	            'Vehículo': 'Vehicle',
+	            'Asistencia': 'Assistència',
+	            'Distancia': 'Distància',
+	            'Precio estimado': 'Preu estimat',
+	            'Conductor preferido': 'Conductor preferit',
+	            'Cualquier conductor disponible': 'Qualsevol conductor disponible',
+	            'Enviar solicitud': 'Enviar sol·licitud',
+	            'Destino': 'Destinació',
+	            'Tipo de servicio': 'Tipus de servei',
+	            'Nombre': 'Nom',
+	            'Rutas actuales': 'Rutes actuals',
+	            'Actuales': 'Actuals',
+	            'Pendientes': 'Pendents',
+	            'Asignadas': 'Assignades',
+	            'Detalles': 'Detalls',
+	            'Aceptar': 'Acceptar',
+	            'Rechazar': 'Rebutjar',
+	            'Ha salido': 'Ha sortit',
+	            'Ha llegado': 'Ha arribat',
+	            'Avanzar ubicación': 'Avançar ubicació',
+	            'Administración': 'Administració',
+	            'Registros de usuarios, conductores y documentos pendientes.': 'Registres d’usuaris, conductors i documents pendents.',
+	            'Historial de reservas': 'Històric de reserves',
+	            'Histórico de trayectos': 'Històric de trajectes'
+	          }
+	        };
+	        const dictionary = dictionaries[currentLang] || {};
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        nodes.forEach((node) => {
+          const value = node.nodeValue;
+          const trimmed = value.trim();
+          if (!trimmed || !dictionary[trimmed]) return;
+          node.nodeValue = value.replace(trimmed, dictionary[trimmed]);
+        });
+        document.querySelectorAll('[placeholder], [title], [aria-label]').forEach((element) => {
+          ['placeholder', 'title', 'aria-label'].forEach((attr) => {
+            const value = element.getAttribute(attr);
+            if (value && dictionary[value]) element.setAttribute(attr, dictionary[value]);
+          });
+        });
+      })();
+    </script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/service-worker.js').catch(function (err) {
+            console.warn('service worker registration failed', err);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

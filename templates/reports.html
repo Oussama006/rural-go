@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header compact-header">
+    <h2>{{ _('History') }}</h2>
+    <p>{{ _('Clear service summary') }}</p>
+  </div>
+
+  <div class="stats-grid mb-4">
+    <div class="stat-card"><span>{{ _('Reservations') }}</span><strong>{{ total_rides }}</strong></div>
+    <div class="stat-card"><span>{{ _('Average price') }}</span><strong>{{ average_price }} €</strong></div>
+    <div class="stat-card"><span>{{ _('Users') }}</span><strong>{{ unique_users }}</strong></div>
+    <div class="stat-card"><span>{{ _('Impact') }}</span><strong>{{ social_impact_score }}</strong></div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-7">
+      <div class="panel-card">
+        <h5 class="mb-3">{{ _('Services breakdown') }}</h5>
+        <ul class="report-list mb-0">
+          {% for label, value in service_counts.items() %}
+            <li><span>{{ label }}</span><strong>{{ value }}</strong></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="panel-card accent-card">
+        <h5 class="mb-3">{{ _('Quick read') }}</h5>
+        <div class="chip-grid">
+          <span class="chip">{{ _('Health') }} {{ health_rides }}</span>
+          <span class="chip">{{ _('Culture') }} {{ culture_rides }}</span>
+          <span class="chip">{{ _('Family') }} {{ family_rides }}</span>
+          <span class="chip">{{ _('Community') }} {{ community_rides }}</span>
+          <span class="chip">{{ _('Nature') }} {{ nature_rides }}</span>
+          <span class="chip">{{ _('Vulnerable') }} {{ vulnerable_rides }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-card">
+    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+      <h5 class="mb-0">{{ _('Route history') }}</h5>
+      <span class="chip">{{ _('Latest count') }} {{ ride_history|length }}</span>
+    </div>
+    {% if ride_history %}
+      <div class="ride-list">
+        {% for ride in ride_history %}
+          <div class="ride-item align-items-start">
+            <div>
+              <strong>#{{ ride.id }} · {{ ride.service_type }}</strong>
+              <div class="text-muted small">{{ ride.origin }} → {{ ride.destination }}</div>
+              <div class="text-muted small">
+                {{ ride_history_clients[ride.id] }} · {{ ride_history_drivers[ride.id] }}
+              </div>
+            </div>
+            <div class="text-end">
+              <span class="status-badge {% if ride.status == 'pending' %}status-pending{% else %}status-assigned{% endif %}">{{ ride.status }}</span>
+              <div class="small mt-1">{{ ride.price }} €</div>
+              <div class="small text-muted">{% if ride.created_at %}{{ ride.created_at.strftime('%d/%m/%Y') }}{% endif %}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">{{ _('No rides yet') }}</p>
+    {% endif %}
+  </div>
+{% endblock %}

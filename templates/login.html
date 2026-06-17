@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="auth-shell">
+    <div class="auth-card auth-card-wide">
+      <div class="auth-header-block">
+        <span class="eyebrow">Accés segur</span>
+        <h2>Entrar</h2>
+        <p class="auth-intro">Usa una demo para probar el flujo rápido por rol.</p>
+      </div>
+
+      <div class="auth-layout">
+        <form method="post" class="auth-form">
+          {% if field_errors and field_errors.get('form') %}
+            <div class="alert-box mb-3">{{ field_errors.get('form') }}</div>
+          {% endif %}
+          <div class="mb-3">
+            <label class="form-label">Usuari</label>
+            <input class="form-control {% if field_errors and field_errors.get('username') %}is-invalid{% endif %}" name="username" type="email" placeholder="nom@ruralgo.local" required value="{{ form_data.get('username', '') }}">
+            {% if field_errors and field_errors.get('username') %}<div class="invalid-feedback d-block">{{ field_errors.get('username') }}</div>{% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Contrasenya</label>
+            <input class="form-control" name="password" type="password" placeholder="********" required>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">Entrar</button>
+          <p class="auth-footnote mt-3 mb-0">No tens compte? <a href="/register">Crea'n un</a>.</p>
+        </form>
+
+        <aside class="demo-panel">
+          <h6 class="mb-2">Demos disponibles</h6>
+          <div class="demo-grid">
+            <div class="demo-card">
+              <strong>Admin</strong>
+              <span>admin@ruralgo.local</span>
+              <small>Admin1234!</small>
+            </div>
+            <div class="demo-card">
+              <strong>Paco</strong>
+              <span>driver1@ruralgo.local</span>
+              <small>Driver1234!</small>
+            </div>
+            <div class="demo-card">
+              <strong>Mario</strong>
+              <span>driver2@ruralgo.local</span>
+              <small>Driver2234!</small>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+{% endblock %}

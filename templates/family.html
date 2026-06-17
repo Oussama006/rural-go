@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header">
+    <span class="eyebrow">Mode familiar</span>
+    <h2>Panell familiar</h2>
+    <p>Seguiment ràpid de trajectes, avisos i recomanacions per a familiars vulnerables.</p>
+  </div>
+
+  <div class="stats-grid mb-4">
+    <div class="stat-card"><span>Visites familiars</span><strong>{{ activity_breakdown['Família'] }}</strong></div>
+    <div class="stat-card"><span>Alertes</span><strong>{{ alerts|length }}</strong></div>
+    <div class="stat-card"><span>Recomanacions</span><strong>{{ recommendations|length }}</strong></div>
+    <div class="stat-card"><span>Trajectes recents</span><strong>{{ family_rides|length }}</strong></div>
+  </div>
+
+  {% if inbox_messages %}
+    <div class="panel-card mb-4">
+      <h5 class="mb-3">Missatges recents</h5>
+      <div class="ride-list">
+        {% for message in inbox_messages %}
+          <div class="ride-item align-items-start">
+            <div>
+              <strong>{{ message.title }}</strong>
+              <div class="small text-muted">{{ message.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+              <div class="small mt-1">{{ message.body }}</div>
+            </div>
+            <span class="chip">{{ message.category }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="panel-card">
+        <h5 class="mb-3">Trajectes familiars recents</h5>
+        {% if family_rides %}
+          <div class="ride-list">
+            {% for ride in family_rides %}
+              <div class="ride-item">
+                <div>
+                  <strong>{{ ride.origin }} → {{ ride.destination }}</strong>
+                  <div class="text-muted small">{{ ride.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                </div>
+                <div class="text-end">
+                  <span class="status-badge {% if ride.status == 'pending' %}status-pending{% else %}status-assigned{% endif %}">{{ ride.status }}</span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">Encara no hi ha trajectes de tipus Família.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="panel-card">
+        <h5 class="mb-3">Avisos i suport</h5>
+        <ul class="simple-list mb-0">
+          {% for alert in alerts %}
+            <li>{{ alert }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="panel-card mt-4">
+        <h5 class="mb-3">Sugeriments</h5>
+        <ul class="simple-list mb-0">
+          {% for recommendation in recommendations %}
+            <li>{{ recommendation }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+{% endblock %}

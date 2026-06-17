@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header compact-header">
+    {% if current_user.role == 'family' %}
+      <h2>Historial de reservas</h2>
+      <p>Todas las reservas que has hecho.</p>
+    {% else %}
+      <h2>Històric de trajectes</h2>
+      <p>Consulta ràpida del servei.</p>
+    {% endif %}
+  </div>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nom</th>
+        <th>Tipus</th>
+        <th>Distància</th>
+        <th>Ajuda</th>
+        <th>Preu</th>
+        <th>Estat</th>
+        <th>Creació</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rides %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.requester }}</td>
+        <td>{{ r.service_type }}</td>
+        <td>{% if r.distance_km %}{{ r.distance_km }} km{% else %}-{% endif %}</td>
+        <td>
+          {% set support_items = r.support_needs.split('|') if r.support_needs else [] %}
+          {% if support_items %}
+            {{ support_items|join(', ')|replace('_', ' ') }}
+          {% else %}
+            -
+          {% endif %}
+        </td>
+        <td>{{ r.price }} €</td>
+        <td>
+          <span class="status-badge {% if r.status == 'pending' %}status-pending{% else %}status-assigned{% endif %}">
+            {{ r.status }}
+          </span>
+        </td>
+        <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

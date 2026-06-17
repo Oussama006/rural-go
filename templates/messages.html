@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header compact-header">
+    <h2>Missatges</h2>
+    <p>Confirmacions i xat de cada reserva.</p>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="panel-card">
+        {% if selected_ride %}
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h5 class="mb-1">Reserva #{{ selected_ride.id }}</h5>
+              <div class="text-muted small">{{ selected_ride.origin }} → {{ selected_ride.destination }}</div>
+              <div class="presence-line mt-2">
+                {% if current_user.role == 'driver' and selected_client %}
+                  <span class="presence-dot {% if selected_client_online %}online{% endif %}"></span>
+                  <span>{{ selected_client.full_name }} {% if selected_client_online %}en línia{% else %}fora de línia{% endif %}</span>
+                {% elif selected_driver %}
+                  <span class="presence-dot {% if selected_driver_online %}online{% endif %}"></span>
+                  <span>{{ selected_driver.full_name }} {% if selected_driver_online %}en línia{% else %}fora de línia{% endif %}</span>
+                {% endif %}
+              </div>
+            </div>
+            <a class="btn btn-sm btn-primary" href="/track/{{ selected_ride.id }}">Veure</a>
+          </div>
+
+          <div class="chat-thread mb-3">
+            {% if chat_messages %}
+              {% for chat in chat_messages %}
+                <div class="chat-bubble {% if chat.sender_user_id == current_user.id %}chat-bubble-out{% else %}chat-bubble-in{% endif %}">
+                  <div class="chat-meta">{{ chat.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                  <div>{{ chat.body }}</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="text-muted mb-0">Encara no hi ha missatges en aquest xat.</p>
+            {% endif %}
+          </div>
+
+          <form method="post" action="/chat/{{ selected_ride.id }}" class="chat-form">
+            <textarea class="form-control mb-2" name="body" rows="3" placeholder="Escriu un missatge"></textarea>
+            <button class="btn btn-primary" type="submit">Enviar</button>
+          </form>
+        {% else %}
+          <p class="text-muted mb-0">Encara no hi ha converses.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="panel-card">
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+          <h5 class="mb-0">Bústia</h5>
+          <span class="chip">{{ message_count }}</span>
+        </div>
+        <div class="message-section mb-3">
+          <div class="message-section-header">
+            <strong>No llegits</strong>
+            <span class="chip"><span id="unreadMessagesCount">{{ inbox_unread_messages|length }}</span></span>
+          </div>
+            <div id="unreadMessagesList" class="email-list">
+              {% for message in inbox_unread_messages %}
+                {% if message.category == 'rating' %}
+                  <div class="email-item unread rating-message message-item" role="button"
+                       data-ride-id="{{ message.ride_id or '' }}"
+                       data-message-id="{{ message.id }}"
+                       data-title="{{ message.title|e }}"
+                       data-body="{{ message.body|e }}"
+                       data-category="rating"
+                       data-created-at="{{ message.created_at.strftime('%d/%m/%Y %H:%M') }}">
+                    <div class="email-marker" aria-hidden></div>
+                    <div>
+                      <div class="email-subject">{{ message.title }}</div>
+                      <div class="email-excerpt">{{ message.body }}</div>
+                      <div class="rating-hint">Puntua la teva experiència:</div>
+                      <form class="rating-inline-form" method="post" action="/ride/{{ message.ride_id }}/rate" data-ride-id="{{ message.ride_id or '' }}" data-message-id="{{ message.id }}">
+                        <input type="hidden" name="ride_id" value="{{ message.ride_id or '' }}">
+                        <div class="rating-stars" data-stars="0">
+                          <button class="rating-star" type="button" data-score="1" aria-label="1 estrella">★</button>
+                          <button class="rating-star" type="button" data-score="2" aria-label="2 estrelles">★</button>
+                          <button class="rating-star" type="button" data-score="3" aria-label="3 estrelles">★</button>
+                          <button class="rating-star" type="button" data-score="4" aria-label="4 estrelles">★</button>
+                          <button class="rating-star" type="button" data-score="5" aria-label="5 estrelles">★</button>
+                          <input type="hidden" name="score" value="0">
+                        </div>
+                        <textarea class="form-control mt-2" name="comment" rows="2" placeholder="Comentari opcional"></textarea>
+                        <button class="btn btn-sm btn-primary mt-2" type="submit">Enviar valoració</button>
+                      </form>
+                    </div>
+                    <div class="email-meta">
+                      <div>{{ message.created_at.strftime('%d/%m') }}</div>
+                      <div class="small">{{ message.created_at.strftime('%H:%M') }}</div>
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="email-item unread message-item" role="button"
+                   data-message-id="{{ message.id }}"
+                   data-ride-id="{{ message.ride_id or '' }}"
+                   data-title="{{ message.title|e }}"
+                   data-body="{{ message.body|e }}"
+                   data-category="{{ message.category }}"
+                   data-created-at="{{ message.created_at.strftime('%d/%m/%Y %H:%M') }}">
+                  <div class="email-marker" aria-hidden></div>
+                  <div>
+                    <div class="email-subject">{{ message.title }}</div>
+                    <div class="email-excerpt">{{ message.body[:120] }}{% if message.body|length > 120 %}...{% endif %}</div>
+                    {% if message.ride_id %}
+                      <a class="btn btn-sm btn-outline-primary mt-2" href="/messages?ride_id={{ message.ride_id }}">Obrir xat</a>
+                    {% endif %}
+                  </div>
+                  <div class="email-meta">
+                    <div>{{ message.created_at.strftime('%d/%m') }}</div>
+                    <div class="small">{{ message.created_at.strftime('%H:%M') }}</div>
+                  </div>
+                </div>
+                {% endif %}
+              {% endfor %}
+              {% if not inbox_unread_messages %}
+                <p class="text-muted mb-0">No tens missatges pendents.</p>
+              {% endif %}
+            </div>
+        </div>
+        <div class="message-section">
+          <div class="message-section-header">
+            <strong>Llegits</strong>
+            <span class="chip"><span id="readMessagesCount">{{ inbox_read_messages|length }}</span></span>
+          </div>
+          <div id="readMessagesList" class="email-list">
+            {% for message in inbox_read_messages %}
+              {% if message.category == 'rating' %}
+                <div class="email-item read rating-message message-item" role="button"
+                     data-ride-id="{{ message.ride_id or '' }}"
+                     data-message-id="{{ message.id }}"
+                     data-title="{{ message.title|e }}"
+                     data-body="{{ message.body|e }}"
+                     data-category="rating"
+                     data-created-at="{{ message.created_at.strftime('%d/%m/%Y %H:%M') }}">
+                  <div class="email-marker" aria-hidden></div>
+                  <div>
+                    <div class="email-subject">{{ message.title }}</div>
+                    <div class="email-excerpt">{{ message.body }}</div>
+                    <form class="rating-inline-form" method="post" action="/ride/{{ message.ride_id }}/rate" data-ride-id="{{ message.ride_id or '' }}" data-message-id="{{ message.id }}">
+                      <input type="hidden" name="ride_id" value="{{ message.ride_id or '' }}">
+                      <div class="rating-stars" data-stars="0">
+                        <button class="rating-star" type="button" data-score="1" aria-label="1 estrella">★</button>
+                        <button class="rating-star" type="button" data-score="2" aria-label="2 estrelles">★</button>
+                        <button class="rating-star" type="button" data-score="3" aria-label="3 estrelles">★</button>
+                        <button class="rating-star" type="button" data-score="4" aria-label="4 estrelles">★</button>
+                        <button class="rating-star" type="button" data-score="5" aria-label="5 estrelles">★</button>
+                        <input type="hidden" name="score" value="0">
+                      </div>
+                      <textarea class="form-control mt-2" name="comment" rows="2" placeholder="Comentari opcional"></textarea>
+                      <button class="btn btn-sm btn-primary mt-2" type="submit">Enviar valoració</button>
+                    </form>
+                  </div>
+                  <div class="email-meta">
+                    <div>{{ message.created_at.strftime('%d/%m') }}</div>
+                    <div class="small">{{ message.created_at.strftime('%H:%M') }}</div>
+                  </div>
+                </div>
+              {% else %}
+                <div class="email-item read message-item" role="button"
+                     data-message-id="{{ message.id }}"
+                     data-ride-id="{{ message.ride_id or '' }}"
+                     data-title="{{ message.title|e }}"
+                     data-body="{{ message.body|e }}"
+                     data-category="{{ message.category }}"
+                     data-created-at="{{ message.created_at.strftime('%d/%m/%Y %H:%M') }}">
+                  <div class="email-marker" aria-hidden></div>
+                  <div>
+                    <div class="email-subject">{{ message.title }}</div>
+                    <div class="email-excerpt">{{ message.body[:120] }}{% if message.body|length > 120 %}...{% endif %}</div>
+                    {% if message.ride_id %}
+                      <a class="btn btn-sm btn-outline-primary mt-2" href="/messages?ride_id={{ message.ride_id }}">Obrir xat</a>
+                    {% endif %}
+                  </div>
+                  <div class="email-meta">
+                    <div>{{ message.created_at.strftime('%d/%m') }}</div>
+                    <div class="small">{{ message.created_at.strftime('%H:%M') }}</div>
+                  </div>
+                </div>
+              {% endif %}
+            {% endfor %}
+            {% if not inbox_read_messages %}
+              <p class="text-muted mb-0">Encara no hi ha missatges llegits.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

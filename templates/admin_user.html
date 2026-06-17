@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header compact-header">
+    <h2>{{ user.full_name }}</h2>
+    <p>{{ user.username }} · {{ user.phone }}</p>
+  </div>
+
+  <section class="profile-hero panel-card mb-4">
+    <div class="profile-avatar">
+      {% if user.profile_photo %}
+        <img src="{{ url_for('static', filename='uploads/profile_photos/' ~ user.profile_photo) }}" alt="Foto de {{ user.full_name }}">
+      {% else %}
+        <span>{{ user.full_name[:1]|upper }}</span>
+      {% endif %}
+    </div>
+    <div class="profile-hero-main">
+      <span class="eyebrow">{{ user.role|upper }}</span>
+      <h3>{{ user.full_name }}</h3>
+      <div class="chip-grid">
+        <span class="chip">{% if online %}En línea{% else %}Offline{% endif %}</span>
+        <span class="chip">{{ user_rides|length }} reservas</span>
+        {% if average_rating %}<span class="chip">{{ average_rating }}/5</span>{% endif %}
+        <span class="chip">Alta {{ user.created_at.strftime('%d/%m/%Y') }}</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <div class="panel-card">
+        <h5 class="mb-3">Editar rol</h5>
+        <form method="post" action="/admin/user/{{ user.id }}/role">
+	          <select class="form-select mb-3" name="role">
+	            <option value="family" {% if user.role == 'family' %}selected{% endif %}>Usuario</option>
+	            <option value="driver" {% if user.role == 'driver' %}selected{% endif %}>Conductor</option>
+	            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+	          </select>
+	          <button class="btn btn-primary" type="submit">Guardar rol</button>
+	        </form>
+	      </div>
+
+	      <div class="panel-card mt-4">
+	        <h5 class="mb-2">Eliminar usuario</h5>
+	        <p class="text-muted small mb-3">
+	          Borra la cuenta y sus datos personales. Si es conductor, las rutas completadas se mantienen en el historial.
+	        </p>
+	        <form method="post" action="/admin/user/{{ user.id }}/delete" onsubmit="return confirm('¿Eliminar este usuario definitivamente?');">
+	          <button class="btn btn-outline-danger" type="submit">Eliminar usuario</button>
+	        </form>
+	      </div>
+	    </div>
+
+    <div class="col-lg-7">
+      <div class="panel-card">
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+          <h5 class="mb-0">Documentos</h5>
+          <span class="chip">{{ documents|length }}</span>
+        </div>
+        {% if documents %}
+          <div class="document-list">
+            {% for document in documents %}
+              <div class="document-item admin-document-item">
+                <div>
+                  <strong>{{ document.title }}</strong>
+                  <span>{{ document.original_filename }} · {{ document.status }}</span>
+                  <a class="btn btn-sm btn-outline-primary mt-2" href="{{ url_for('static', filename='uploads/documents/' ~ document.filename) }}" target="_blank">Ver documento</a>
+                </div>
+                {% if document.status == 'Pendent' %}
+                  <div class="d-flex flex-wrap gap-2 justify-content-end">
+                    <form method="post" action="/admin/document/{{ document.id }}/review">
+                      <input type="hidden" name="decision" value="approve">
+                      <button class="btn btn-sm btn-success" type="submit">Validar</button>
+                    </form>
+                    <form method="post" action="/admin/document/{{ document.id }}/review">
+                      <input type="hidden" name="decision" value="reject">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Rechazar</button>
+                    </form>
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">Este perfil no tiene documentos subidos.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-card mt-4">
+    <h5 class="mb-3">Reservas y rutas</h5>
+    {% if user_rides %}
+      <div class="ride-list">
+        {% for ride in user_rides %}
+          <div class="ride-item">
+            <div>
+              <strong>#{{ ride.id }} · {{ ride.service_type }}</strong>
+              <div class="text-muted small">{{ ride.origin }} → {{ ride.destination }}</div>
+            </div>
+            <div class="text-end">
+              <span class="status-badge {% if ride.status == 'pending' %}status-pending{% else %}status-assigned{% endif %}">{{ ride.status }}</span>
+              <div class="small mt-1">{{ ride.price }} €</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">Sin reservas todavía.</p>
+    {% endif %}
+  </div>
+{% endblock %}

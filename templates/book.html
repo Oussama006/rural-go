@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header">
+    <h2>Reservar trajecte</h2>
+    <p>La reserva queda vinculada al teu compte i apareix al panell de seguiment.</p>
+  </div>
+  {% if aura_prefill %}
+    <div class="alert-box mb-3">
+      <h6>Reserva preomplerta per AURA</h6>
+      <p class="mb-0">{{ aura_prefill.get('aura_title', 'Proposta preparada') }}. {{ aura_prefill.get('aura_summary', '') }}</p>
+      {% if aura_prefill.get('aura_next_step') %}
+        <p class="mb-0 mt-2"><strong>Següent pas:</strong> {{ aura_prefill.get('aura_next_step') }}</p>
+      {% endif %}
+    </div>
+  {% endif %}
+  <div class="form-card">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Nom</label>
+        <input class="form-control {% if field_errors and field_errors.get('requester') %}is-invalid{% endif %}" name="requester" required placeholder="El teu nom complet" value="{{ form_data.get('requester', current_user.full_name) }}">
+        {% if field_errors and field_errors.get('requester') %}<div class="invalid-feedback d-block">{{ field_errors.get('requester') }}</div>{% endif %}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Telèfon</label>
+        <input class="form-control {% if field_errors and field_errors.get('phone') %}is-invalid{% endif %}" name="phone" placeholder="+34 600 000 000" value="{{ form_data.get('phone', current_user.phone) }}">
+        {% if field_errors and field_errors.get('phone') %}<div class="invalid-feedback d-block">{{ field_errors.get('phone') }}</div>{% endif %}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Tipus de servei</label>
+        <select class="form-select {% if field_errors and field_errors.get('service_type') %}is-invalid{% endif %}" name="service_type">
+          {% for service in service_catalog %}
+            {% if service.service_type not in ['Salut'] or service.category == 'Salut' %}
+              <option value="{{ service.service_type }}" {% if form_data.get('service_type', 'Comunitat') == service.service_type %}selected{% endif %}>{{ service.category }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+        {% if field_errors and field_errors.get('service_type') %}<div class="invalid-feedback d-block">{{ field_errors.get('service_type') }}</div>{% endif %}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Conductor preferit</label>
+        <select class="form-select {% if field_errors and field_errors.get('preferred_driver_id') %}is-invalid{% endif %}" name="preferred_driver_id">
+          <option value="any" {% if form_data.get('preferred_driver_id', 'any') == 'any' %}selected{% endif %}>Qualsevol conductor disponible</option>
+          {% for driver in drivers %}
+            <option value="{{ driver.id }}" {% if driver_busy_map and driver_busy_map.get(driver.id) %}disabled{% endif %} {% if form_data.get('preferred_driver_id')|string == driver.id|string %}selected{% endif %}>
+              {{ driver.full_name }}{% if driver_busy_map and driver_busy_map.get(driver.id) %} - té una ruta activa{% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        <small class="text-muted d-block mt-1">Si esculls una persona concreta i està disponible, la ruta se li enviarà a aquest conductor. Si ja té una ruta activa, es podrà seleccionar quan la completi.</small>
+        {% if field_errors and field_errors.get('preferred_driver_id') %}<div class="invalid-feedback d-block">{{ field_errors.get('preferred_driver_id') }}</div>{% endif %}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Origen</label>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <button class="btn btn-sm btn-primary" type="button" id="useCurrentLocation">Usar la meva ubicació</button>
+          <span class="chip">Origen ràpid</span>
+        </div>
+        <input class="form-control {% if field_errors and field_errors.get('origin') %}is-invalid{% endif %}" name="origin" id="originInput" list="locationSuggestions" required placeholder="Lloc de sortida" value="{{ form_data.get('origin', '') }}">
+        {% if field_errors and field_errors.get('origin') %}<div class="invalid-feedback d-block">{{ field_errors.get('origin') }}</div>{% endif %}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Destinació</label>
+        <input class="form-control {% if field_errors and field_errors.get('destination') %}is-invalid{% endif %}" name="destination" id="destinationInput" list="locationSuggestions" required placeholder="Lloc d'arribada" value="{{ form_data.get('destination', '') }}">
+        <div class="mt-2 destination-filters" id="destinationFilters">
+          <button class="chip" type="button" data-filter="all">Tots</button>
+          <button class="chip" type="button" data-filter="igualada">Zona urbana</button>
+          <button class="chip" type="button" data-filter="salut">Salut</button>
+          <button class="chip" type="button" data-filter="cultura">Cultura</button>
+          <button class="chip" type="button" data-filter="natura">Natura</button>
+        </div>
+        <small class="text-muted d-block mt-2">Escriu “parc”, “CAP”, “teatre” o el municipi exacte i et sortiran opcions més concretes.</small>
+        {% if field_errors and field_errors.get('destination') %}<div class="invalid-feedback d-block">{{ field_errors.get('destination') }}</div>{% endif %}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Assistència durant el trajecte</label>
+        <div class="support-grid">
+          {% for option in support_options %}
+            <label class="form-check support-card">
+              <input class="form-check-input" type="checkbox" name="support_needs" value="{{ option.value }}" {% if option.value in form_data.get('support_needs', []) %}checked{% endif %}>
+              <span class="form-check-label">{{ option.label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        <small class="text-muted d-block mt-2">Marca tot el que necessitis. El conductor ho veurà abans de sortir.</small>
+      </div>
+      <datalist id="locationSuggestions">
+        <option value="CAP Anoia"></option>
+        <option value="CAP Igualada Nord"></option>
+        <option value="CAP Igualada Sud"></option>
+        <option value="Hospital Universitari d'Igualada"></option>
+        <option value="Farmàcia d'Igualada Centre"></option>
+        <option value="Teatre de l'Ateneu Igualadí"></option>
+        <option value="Museu de la Pell d'Igualada"></option>
+        <option value="Parc Central d'Igualada"></option>
+        <option value="Parc de Valldaura d'Igualada"></option>
+        <option value="Passeig Verdaguer d'Igualada"></option>
+        <option value="Plaça Cal Font"></option>
+        <option value="Biblioteca Central d'Igualada"></option>
+        <option value="Mercat de la Masuca"></option>
+        <option value="Estació d'autobusos d'Igualada"></option>
+      </datalist>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="wheelchair" id="wheelchair" {% if form_data.get('wheelchair') %}checked{% endif %}>
+        <label class="form-check-label" for="wheelchair">Requereix adaptació per cadira de rodes</label>
+      </div>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="vulnerable" id="vulnerable" {% if form_data.get('vulnerable') %}checked{% endif %}>
+        <label class="form-check-label" for="vulnerable">Perfil vulnerable (subvenció)</label>
+      </div>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="viva_pass" id="viva_pass" {% if form_data.get('viva_pass') %}checked{% endif %}>
+        <label class="form-check-label" for="viva_pass">Tinc Viva Pass (subscripció)</label>
+      </div>
+      <div class="alert-box mb-3">
+        <strong>Distància i preu</strong>
+        <p class="mb-0">El sistema calcularà els quilòmetres reals entre origen i destinació abans de guardar la petició.</p>
+      </div>
+      <button class="btn btn-warning mt-2" type="submit">Enviar sol·licitud</button>
+    </form>
+  </div>
+  <script>
+    window.addEventListener('load', function () {
+      const originInput = document.getElementById('originInput');
+      const destinationInput = document.getElementById('destinationInput');
+      const currentLocationButton = document.getElementById('useCurrentLocation');
+      const filterButtons = Array.from(document.querySelectorAll('#destinationFilters [data-filter]'));
+
+      const destinationCatalog = [
+        { value: 'CAP Anoia', label: 'CAP Anoia', area: 'igualada', type: 'salut', keywords: ['cap', 'anoia', 'igualada', 'salut'] },
+        { value: 'CAP Igualada Nord', label: 'CAP Igualada Nord', area: 'igualada', type: 'salut', keywords: ['cap', 'igualada', 'nord', 'salut'] },
+        { value: 'CAP Igualada Sud', label: 'CAP Igualada Sud', area: 'igualada', type: 'salut', keywords: ['cap', 'igualada', 'sud', 'salut'] },
+        { value: 'Hospital Universitari d\'Igualada', label: 'Hospital Universitari d\'Igualada', area: 'igualada', type: 'salut', keywords: ['hospital', 'universitari', 'igualada', 'salut'] },
+        { value: 'Farmàcia d\'Igualada Centre', label: 'Farmàcia d\'Igualada Centre', area: 'igualada', type: 'salut', keywords: ['farmàcia', 'igualada', 'salut'] },
+        { value: 'Teatre de l\'Ateneu Igualadí', label: 'Teatre de l\'Ateneu Igualadí', area: 'igualada', type: 'cultura', keywords: ['teatre', 'ateneu', 'igualada', 'cultura'] },
+        { value: 'Museu de la Pell d\'Igualada', label: 'Museu de la Pell d\'Igualada', area: 'igualada', type: 'cultura', keywords: ['museu', 'pell', 'igualada', 'cultura'] },
+        { value: 'Biblioteca Central d\'Igualada', label: 'Biblioteca Central d\'Igualada', area: 'igualada', type: 'cultura', keywords: ['biblioteca', 'igualada', 'cultura'] },
+        { value: 'Parc Central d\'Igualada', label: 'Parc Central d\'Igualada', area: 'igualada', type: 'natura', keywords: ['parc', 'central', 'igualada', 'natura'] },
+        { value: 'Parc de Valldaura d\'Igualada', label: 'Parc de Valldaura d\'Igualada', area: 'igualada', type: 'natura', keywords: ['parc', 'valldaura', 'igualada', 'natura'] },
+        { value: 'Passeig Verdaguer d\'Igualada', label: 'Passeig Verdaguer d\'Igualada', area: 'igualada', type: 'natura', keywords: ['passeig', 'verdaguer', 'igualada', 'natura'] },
+        { value: 'Plaça Cal Font', label: 'Plaça Cal Font', area: 'igualada', type: 'comunitat', keywords: ['plaça', 'cal', 'font', 'igualada', 'comunitat'] },
+        { value: 'Mercat de la Masuca', label: 'Mercat de la Masuca', area: 'igualada', type: 'comunitat', keywords: ['mercat', 'masuca', 'igualada', 'comunitat'] },
+        { value: 'Estació d\'autobusos d\'Igualada', label: 'Estació d\'autobusos d\'Igualada', area: 'igualada', type: 'comunitat', keywords: ['estació', 'autobusos', 'igualada', 'comunitat'] },
+      ];
+
+      let activeFilter = 'all';
+
+      function normalizeText(text) {
+        return (text || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+      }
+
+      function getMatchingDestinations(queryText) {
+        const normalizedQuery = normalizeText(queryText);
+        return destinationCatalog.filter((item) => {
+          const matchesFilter = activeFilter === 'all' || item.area === activeFilter || item.type === activeFilter;
+          const haystack = normalizeText([item.value, item.label, item.area, item.type, item.keywords.join(' ')].join(' '));
+          const matchesQuery = !normalizedQuery || haystack.includes(normalizedQuery);
+          return matchesFilter && matchesQuery;
+        }).slice(0, 10);
+      }
+
+      function renderSuggestions() {
+        const catalog = document.getElementById('locationSuggestions');
+        if (!catalog) return;
+
+        const matches = getMatchingDestinations(destinationInput.value);
+        catalog.innerHTML = '';
+        matches.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.value;
+          catalog.appendChild(option);
+        });
+      }
+
+      function syncFilterState() {
+        filterButtons.forEach((button) => {
+          button.classList.toggle('active', button.dataset.filter === activeFilter);
+        });
+      }
+
+      function distanceKm(lat1, lng1, lat2, lng2) {
+        const radius = 6371;
+        const toRad = (value) => value * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLng = toRad(lng2 - lng1);
+        const a = Math.sin(dLat / 2) ** 2
+          + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+        return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      currentLocationButton?.addEventListener('click', function () {
+        if (!navigator.geolocation) {
+          alert('El navegador no suporta geolocalització.');
+          return;
+        }
+
+        currentLocationButton.disabled = true;
+        currentLocationButton.textContent = 'Detectant ubicació...';
+
+        navigator.geolocation.getCurrentPosition(function (position) {
+          const realLatitude = position.coords.latitude;
+          const realLongitude = position.coords.longitude;
+          const igualadaLatitude = 41.581;
+          const igualadaLongitude = 1.617;
+          const useDemoPoint = distanceKm(realLatitude, realLongitude, igualadaLatitude, igualadaLongitude) > 25;
+          const latitude = (useDemoPoint ? igualadaLatitude : realLatitude).toFixed(5);
+          const longitude = (useDemoPoint ? igualadaLongitude : realLongitude).toFixed(5);
+          originInput.value = `GPS:${latitude},${longitude} - Ubicació actual`;
+          currentLocationButton.textContent = 'Ubicació aplicada';
+        }, function () {
+          alert('No s’ha pogut obtenir la ubicació. Comprova els permisos del navegador.');
+          currentLocationButton.disabled = false;
+          currentLocationButton.textContent = 'Usar la meva ubicació';
+        }, { enableHighAccuracy: true, timeout: 8000 });
+      });
+
+      filterButtons.forEach((button) => {
+        button.addEventListener('click', function () {
+          activeFilter = button.dataset.filter || 'all';
+          syncFilterState();
+          renderSuggestions();
+          destinationInput.focus();
+        });
+      });
+
+      destinationInput.addEventListener('input', renderSuggestions);
+      destinationInput.addEventListener('focus', renderSuggestions);
+
+      activeFilter = 'all';
+      syncFilterState();
+      renderSuggestions();
+    });
+  </script>
+{% endblock %}

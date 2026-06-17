@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header compact-header">
+    <h2>Perfil</h2>
+    <p>Gestiona les teves dades principals.</p>
+  </div>
+
+  <section class="profile-hero panel-card mb-4">
+    <div class="profile-avatar">
+      {% if current_user.profile_photo %}
+        <img src="{{ url_for('static', filename='uploads/profile_photos/' ~ current_user.profile_photo) }}" alt="Foto de perfil">
+      {% else %}
+        <span>{{ current_user.full_name[:1]|upper }}</span>
+      {% endif %}
+    </div>
+    <div class="profile-hero-main">
+      <span class="eyebrow">{{ current_user.role|upper }}</span>
+      <h3>{{ current_user.full_name }}</h3>
+      <p>{{ current_user.username }} · {{ current_user.phone }}</p>
+      <div class="chip-grid">
+        {% if current_user.role == 'family' %}
+          <span class="chip">{{ insights.rides_count }} reserves</span>
+        {% elif current_user.role == 'driver' %}
+          <span class="chip">{{ insights.rides_count }} trajectes</span>
+        {% endif %}
+        {% if average_rating %}<span class="chip">{{ average_rating }}/5</span>{% endif %}
+        <span class="chip">Alta {{ current_user.created_at.strftime('%d/%m/%Y') }}</span>
+      </div>
+    </div>
+    <div class="profile-photo-form d-flex flex-wrap gap-2 justify-content-end">
+      <form method="post" action="/profile/photo" enctype="multipart/form-data">
+      <label class="btn btn-sm btn-outline-primary mb-0">
+        Canviar foto
+        <input class="d-none" type="file" name="profile_photo" accept="image/*" onchange="this.form.submit()">
+      </label>
+      </form>
+      {% if current_user.profile_photo %}
+        <form method="post" action="/profile/photo/delete">
+          <button class="btn btn-sm btn-outline-danger" type="submit">Eliminar foto</button>
+        </form>
+      {% endif %}
+    </div>
+  </section>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="panel-card profile-card">
+        <h5 class="mb-3">Dades</h5>
+        <form method="post">
+          {% if field_errors and field_errors.get('form') %}
+            <div class="alert-box mb-3">{{ field_errors.get('form') }}</div>
+          {% endif %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Nom</label>
+              <input class="form-control" type="text" name="full_name" value="{{ form_data.get('full_name', '') }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input class="form-control {% if field_errors and field_errors.get('username') %}is-invalid{% endif %}" type="email" name="username" value="{{ form_data.get('username', '') }}" required>
+              {% if field_errors and field_errors.get('username') %}<div class="invalid-feedback d-block">{{ field_errors.get('username') }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Telèfon</label>
+              <input class="form-control" type="text" name="phone" value="{{ form_data.get('phone', '') }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Contrasenya nova</label>
+              <input class="form-control" type="password" name="password" placeholder="Opcional">
+            </div>
+          </div>
+          <button class="btn btn-primary mt-4" type="submit">Guardar</button>
+        </form>
+      </div>
+
+      {% if current_user.role == 'driver' %}
+        <div class="panel-card profile-card mt-4">
+          <h5 class="mb-3">Estat del conductor</h5>
+          <form method="post" action="/profile/online" class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+              <strong>{% if current_user.online_visible %}Visible en línia{% else %}No visible{% endif %}</strong>
+              <div class="text-muted small">Controla si apareixes com a conductor disponible/en línia per a clients i administració.</div>
+            </div>
+            <label class="form-check form-switch m-0">
+              <input class="form-check-input" type="checkbox" name="online_visible" value="1" {% if current_user.online_visible %}checked{% endif %}>
+              <span class="form-check-label">En línia</span>
+            </label>
+            <button class="btn btn-primary" type="submit">Guardar estat</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="col-lg-5">
+      {% if current_user.role not in ['admin'] %}
+        <div class="panel-card mb-4">
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+            <h5 class="mb-0">Documents</h5>
+            <span class="chip">{{ uploaded_documents|length }}</span>
+          </div>
+          <form method="post" action="/profile/documents" enctype="multipart/form-data" class="document-upload-form mb-3">
+            <input class="form-control form-control-sm mb-2" type="text" name="title" placeholder="Nom del document">
+            <input class="form-control form-control-sm mb-2" type="file" name="document" required>
+            <button class="btn btn-sm btn-primary" type="submit">Afegir document</button>
+          </form>
+
+          <div class="document-list">
+            {% for document in uploaded_documents %}
+              <div class="document-item">
+                <div>
+                  <strong>{{ document.title }}</strong>
+                  <span>{{ document.original_filename }}</span>
+                </div>
+                <span class="status-note">{{ document.status }}</span>
+              </div>
+            {% endfor %}
+            {% for document in suggested_documents %}
+              <div class="document-item muted-document">
+                <div>
+                  <strong>{{ document.name }}</strong>
+                  <span>{{ document.detail }}</span>
+                </div>
+                <span class="status-note">{{ document.status }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if current_user.role == 'family' %}
+        <div class="panel-card">
+          <h5 class="mb-3">Reserves</h5>
+          <div class="stats-grid stats-grid-two">
+            <div class="stat-card"><span>Total</span><strong>{{ insights.rides_count }}</strong></div>
+            <div class="stat-card"><span>Salut</span><strong>{{ insights.activity_breakdown.get('Salut', 0) }}</strong></div>
+          </div>
+          <a class="btn btn-sm btn-primary mt-3" href="/rides">Veure historial</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

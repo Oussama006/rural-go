@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="page-header compact-header">
+    <h2>Conductor</h2>
+    <p>Rutes assignades i seguiment operatiu del servei.</p>
+  </div>
+
+  <div class="driver-command mb-4">
+    <div>
+      <span class="eyebrow">Turno</span>
+      <h5>{% if has_active_route %}Ruta activa{% else %}De moment no tens cap ruta en curs{% endif %}</h5>
+      <div class="chip-grid mt-3">
+        <span class="chip chip-light">Una ruta activa como máximo</span>
+        <span class="chip chip-light">Asistencia visible</span>
+        <span class="chip chip-light">Seguiment en directe</span>
+      </div>
+    </div>
+    <div class="driver-command-kpis">
+      <div><span>En curso</span><strong>{{ active_routes }}</strong></div>
+      <div><span>Fet</span><strong>{{ finished_routes }}</strong></div>
+      <div><span>Rutes</span><strong>{{ rides|length }}</strong></div>
+    </div>
+  </div>
+
+  <div class="panel-card mb-4">
+    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+      <h5 class="mb-0">Rutes actuals</h5>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm {% if status_filter == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="/driver?status=active">Actuals</a>
+        <a class="btn btn-sm {% if status_filter == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="/driver?status=pending">Pendents</a>
+        <a class="btn btn-sm {% if status_filter == 'assigned' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="/driver?status=assigned">Assignades</a>
+        <a class="btn btn-sm {% if status_filter == 'in_route' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="/driver?status=in_route">En ruta</a>
+        <a class="btn btn-sm {% if status_filter == 'completed' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="/driver?status=completed">Historial</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-12">
+      <div class="panel-card">
+        {% if rides %}
+          <div class="driver-route-list">
+            {% for ride in rides %}
+              {% set client = ride_clients[ride.id] %}
+              <article class="driver-route-card" data-ride-id="{{ ride.id }}" data-ride-status="{{ ride.status }}">
+                <div>
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <strong>{{ ride.requester }}</strong>
+                    {% if client %}
+                      <span class="presence-dot {% if ride_client_online[ride.id] %}online{% endif %}"></span>
+                    {% endif %}
+                  </div>
+                  <span>{{ ride.service_type }} · {{ ride.origin }} → {{ ride.destination }}</span>
+                </div>
+                <div class="driver-route-actions">
+                  <span class="status-badge {% if ride.status == 'pending' %}status-pending{% else %}status-assigned{% endif %}">{{ ride.status }}</span>
+                  <button
+                    class="btn btn-sm btn-outline-primary"
+                    type="button"
+                    data-driver-detail-target="#rideDetail-{{ ride.id }}"
+                    aria-controls="rideDetail-{{ ride.id }}"
+                  >
+                    Detalls
+                  </button>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">De moment no tens cap ruta.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% for ride in rides %}
+    {% set client = ride_clients[ride.id] %}
+    <div class="modal fade driver-detail-modal" id="rideDetail-{{ ride.id }}" tabindex="-1" aria-labelledby="rideDetailTitle-{{ ride.id }}" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title" id="rideDetailTitle-{{ ride.id }}">Ruta #{{ ride.id }}</h5>
+              <div class="small text-muted">{{ ride.origin }} → {{ ride.destination }}</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <div class="summary-grid mb-3">
+              <div class="summary-item"><span>Client</span><strong>{{ client.full_name if client else ride.requester }}</strong></div>
+              <div class="summary-item"><span>Telèfon</span><strong>{{ client.phone if client else ride.phone }}</strong></div>
+              <div class="summary-item"><span>Estado</span><strong>{{ ride.status }}</strong></div>
+              <div class="summary-item"><span>Online</span><strong>{% if client and ride_client_online[ride.id] %}Sí{% else %}No{% endif %}</strong></div>
+              <div class="summary-item"><span>Distancia</span><strong>{% if ride.distance_km %}{{ ride.distance_km }} km{% else %}Pendiente{% endif %}</strong></div>
+              <div class="summary-item"><span>Vehicle</span><strong>{{ ride_vehicles[ride.id].name if ride_vehicles[ride.id] else 'Pendent' }}</strong></div>
+            </div>
+            <p class="mb-3"><strong>Assistència:</strong> {{ ride_support_summary[ride.id] }}</p>
+            <div class="d-flex flex-wrap gap-2 driver-detail-actions">
+              {% if ride.status == 'pending' %}
+                {% if has_active_route %}
+                  <button class="btn btn-primary" type="button" disabled>Completa la ruta activa</button>
+                {% else %}
+                  <form method="post" action="/driver/ride/{{ ride.id }}/decision">
+                    <input type="hidden" name="decision" value="accept">
+                    <button class="btn btn-primary" type="submit">Acceptar</button>
+                  </form>
+                {% endif %}
+                <form method="post" action="/driver/ride/{{ ride.id }}/decision">
+                  <input type="hidden" name="decision" value="reject">
+                  <button class="btn btn-outline-danger" type="submit">Rebutjar</button>
+                </form>
+              {% elif ride.status != 'completed' %}
+                <form method="post" action="/driver/ride/{{ ride.id }}/status">
+                  <input type="hidden" name="status" value="in_route">
+                  <button class="btn btn-primary" type="submit">Ha sortit</button>
+                </form>
+                <form method="post" action="/driver/ride/{{ ride.id }}/status">
+                  <input type="hidden" name="status" value="completed">
+                  <button class="btn btn-success" type="submit">Ha arribat</button>
+                </form>
+                <form method="post" action="/driver/ride/{{ ride.id }}/location">
+                  <input type="hidden" name="move_factor" value="0.28">
+                  <input type="hidden" name="speed_kmh" value="32">
+                  <input type="hidden" name="heading" value="east">
+                  <button class="btn btn-outline-primary" type="submit">Avançar ubicació</button>
+                </form>
+              {% endif %}
+              <a class="btn btn-outline-primary" href="/track/{{ ride.id }}">Seguiment</a>
+              <a class="btn btn-outline-primary" href="/messages?ride_id={{ ride.id }}">Chat</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const rideCards = Array.from(document.querySelectorAll('.driver-route-card[data-ride-id]'));
+      const detailButtons = Array.from(document.querySelectorAll('[data-driver-detail-target]'));
+      const detailModals = Array.from(document.querySelectorAll('.driver-detail-modal'));
+
+      if (typeof bootstrap !== 'undefined') {
+        detailModals.forEach((modal) => {
+          if (modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+          }
+        });
+
+        detailButtons.forEach((button) => {
+          button.addEventListener('click', function () {
+            const selector = this.getAttribute('data-driver-detail-target');
+            const modal = selector ? document.querySelector(selector) : null;
+            if (!modal) return;
+            const openModal = document.querySelector('.driver-detail-modal.show');
+            if (openModal && openModal !== modal) {
+              bootstrap.Modal.getInstance(openModal)?.hide();
+            }
+            bootstrap.Modal.getOrCreateInstance(modal, {
+              backdrop: true,
+              keyboard: true,
+              focus: true
+            }).show();
+          });
+        });
+      }
+
+      const tickRides = async () => {
+        for (const card of rideCards) {
+          const rideId = card.getAttribute('data-ride-id');
+          const status = card.getAttribute('data-ride-status');
+          if (status === 'completed' || status === 'pending') continue;
+          try {
+            const response = await fetch(`/driver/ride/${rideId}/tick`, { method: 'POST' });
+            if (!response.ok) continue;
+            const data = await response.json();
+            if (data.status === 'completed') {
+              window.location.href = `/track/${rideId}`;
+              return;
+            }
+          } catch (err) {
+            console.warn('No s’ha pogut actualitzar la ubicació', err);
+          }
+        }
+      };
+      setInterval(tickRides, 25000);
+    });
+  </script>
+{% endblock %}
